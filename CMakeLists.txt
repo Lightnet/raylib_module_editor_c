@@ -332,6 +332,7 @@ if(${EXPORT_FLECS_APP})
         src/module_enet.c
         # src/main.c
         src/main_enet_test.c
+        # src/enet_test.c
         # src/raylib_physics_ode.c
         # src/raylib_flecs_ode_gui.c
     )
@@ -349,12 +350,12 @@ if(${EXPORT_FLECS_APP})
         ${lua_SOURCE_DIR}                                   # lua
         ${raylib_SOURCE_DIR}/src                            # raylib include
         ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
-        # ${enet_SOURCE_DIR}/include                        # enet
+        ${enet_SOURCE_DIR}/include                          # enet
         # ${stb_SOURCE_DIR}                                 # stb
         ${raygui_SOURCE_DIR}/src                            # raygui
         ${cglm_SOURCE_DIR}/include                          # clgm
-        # ${ode_SOURCE_DIR}/include                          # 
-        ${ode_BINARY_DIR}/include                          # 
+        # ${ode_SOURCE_DIR}/include                         # 
+        ${ode_BINARY_DIR}/include                           # 
     )
     # Windows-specific settings
     if(WIN32)
@@ -363,7 +364,8 @@ if(${EXPORT_FLECS_APP})
             ws2_32                                          # Winsock 2
             gdi32                                           # Graphics Device Interface
             user32                                          # Windows user interface
-            shell32                                         # Windows Shell
+            shell32                                         # Windows 
+            ws2_32                                          # network socket
         )
         # target_link_options(${APP_NAME} PRIVATE -static-libgcc)
         target_link_options(${APP_FLECS_NAME} PRIVATE
@@ -373,6 +375,109 @@ if(${EXPORT_FLECS_APP})
         )
     endif()
 endif()
+
+
+
+
+
+
+set(EXPORT_ENET_APP ON)
+# set(EXPORT_FLECS_APP OFF)
+
+if(${EXPORT_ENET_APP})
+    message(STATUS "EXPORT ENET APP")
+    set(APP_ENET_CLIENT_NAME enet_client)
+    add_executable(${APP_ENET_CLIENT_NAME}
+        src/enet_client.c
+    )
+    # Link application with custom_cimgui
+    target_link_libraries(${APP_ENET_CLIENT_NAME} PRIVATE 
+        raylib                                          # raylib
+        flecs                                           # flecs
+        # cglm                                            # cglm
+        # ODE                                             # ode must be cap from ode repo cmake config
+    )
+    # Include directories for the application
+    target_include_directories(${APP_ENET_CLIENT_NAME} PUBLIC
+        ${PROJECT_SOURCE_DIR}/include                       # include
+        ${lua_SOURCE_DIR}                                   # lua
+        ${raylib_SOURCE_DIR}/src                            # raylib include
+        ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+        ${enet_SOURCE_DIR}/include                          # enet
+        # ${stb_SOURCE_DIR}                                 # stb
+        ${raygui_SOURCE_DIR}/src                            # raygui
+        ${cglm_SOURCE_DIR}/include                          # clgm
+        # ${ode_SOURCE_DIR}/include                         # 
+        # ${ode_BINARY_DIR}/include                           # 
+    )
+    # Windows-specific settings
+    if(WIN32)
+        target_link_libraries(${APP_ENET_CLIENT_NAME} PRIVATE 
+            ws2_32                                          # Winsock 2
+            gdi32                                           # Graphics Device Interface
+            user32                                          # Windows user interface
+            shell32                                         # Windows 
+            ws2_32                                          # network socket
+        )
+        target_link_options(${APP_ENET_CLIENT_NAME} PRIVATE
+            -static-libgcc                                  # GNU Compiler Collection
+            -static-libstdc++                               # Uncomment if C++ code is used
+            -static                                         # Avoid full static linking to prevent issues with system libraries
+        )
+    endif()
+
+
+    set(APP_ENET_SERVER_NAME enet_server)
+    add_executable(${APP_ENET_SERVER_NAME}
+        src/enet_server.c
+    )
+    # Link application with custom_cimgui
+    target_link_libraries(${APP_ENET_SERVER_NAME} PRIVATE 
+        raylib                                          # raylib
+        flecs                                           # flecs
+        # cglm                                            # cglm
+        # ODE                                             # ode must be cap from ode repo cmake config
+    )
+    # Include directories for the application
+    target_include_directories(${APP_ENET_SERVER_NAME} PUBLIC
+        ${PROJECT_SOURCE_DIR}/include                       # include
+        ${lua_SOURCE_DIR}                                   # lua
+        ${raylib_SOURCE_DIR}/src                            # raylib include
+        ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+        ${enet_SOURCE_DIR}/include                          # enet
+        # ${stb_SOURCE_DIR}                                 # stb
+        ${raygui_SOURCE_DIR}/src                            # raygui
+        ${cglm_SOURCE_DIR}/include                          # clgm
+        # ${ode_SOURCE_DIR}/include                         # 
+        # ${ode_BINARY_DIR}/include                           # 
+    )
+    # Windows-specific settings
+    if(WIN32)
+        target_link_libraries(${APP_ENET_SERVER_NAME} PRIVATE 
+            ws2_32                                          # Winsock 2
+            gdi32                                           # Graphics Device Interface
+            user32                                          # Windows user interface
+            shell32                                         # Windows 
+            ws2_32                                          # network socket
+        )
+        target_link_options(${APP_ENET_SERVER_NAME} PRIVATE
+            -static-libgcc                                  # GNU Compiler Collection
+            -static-libstdc++                               # Uncomment if C++ code is used
+            -static                                         # Avoid full static linking to prevent issues with system libraries
+        )
+    endif()
+endif()
+
+
+
+
+
+
+
+
+
+
+
 
 
 
