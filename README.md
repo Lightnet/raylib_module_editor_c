@@ -2,16 +2,30 @@
 
 # License: MIT
 
+# Status:
+- Prototyping builds.
+- network test.
+
+# Programing Languages:
+- c language ( c99 )
+- cmake ( for config build )
+- lua ?
+
+# Tools:
+- Cmake
+- Msys2 64
+
 # Information:
-  To create sample to understand to build minecraft clone in c program language. As well creating samples using raylib and flecs to build tests.
+  To create sample file examples for raylib, flecs and other libraries to build tests.
+  
+  Idea base on minecraft to create base game for voxel in c program language. It be blocks and non block mesh to keep thing simple. It low poloygon style.
 
 # Goals:
 - need to add examples
-- add and remove
-- raygui test example how handle entity remove and add
-- 
+- raygui to handle entity type of data
+- physics 3d using the ODE
+- network test using enet simple
 
-- 
 ## editor:
 - select object
 - menu
@@ -22,5 +36,11 @@
   - rotation
   - scale
 
-# design:
+# Design:
+- 
+
+# Credits:
+- https://www.raylib.com/
+- https://www.flecs.dev
+- https://github.com/SanderMertens/flecs
 - 

@@ -1,28 +1,51 @@
-// ecs components
+// flecs v4.1.1
+// raylib 5.5
+// raygui 4.0
 
-// ecs_components.c
-#include "ecs_components.h"
 #include <stdio.h>
+#include "raylib.h"
+#include "raymath.h"
+#include "flecs.h"
+
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-// Define global phase entities
-ecs_entity_t PreLogicUpdatePhase = 0;
-ecs_entity_t LogicUpdatePhase = 0;
-ecs_entity_t RLBeginDrawingPhase = 0;
-ecs_entity_t RLRender2D0Phase = 0;
-ecs_entity_t RLBeginMode3DPhase = 0;
-ecs_entity_t RLRender3DPhase = 0;
-ecs_entity_t RLEndMode3DPhase = 0;
-ecs_entity_t RLRender2D1Phase = 0;
-ecs_entity_t RLEndDrawingPhase = 0;
-
+// Transform3D component
+typedef struct {
+    Vector3 position;         // Local position
+    Quaternion rotation;      // Local rotation
+    Vector3 scale;            // Local scale
+    Matrix localMatrix;       // Local transform matrix
+    Matrix worldMatrix;       // World transform matrix
+    bool isDirty;             // Flag to indicate if transform needs updating
+} Transform3D;
 ECS_COMPONENT_DECLARE(Transform3D);
+
+// Pointer component for raylib Model
+typedef struct {
+    Model* model;             // Pointer to Model
+} ModelComponent;
 ECS_COMPONENT_DECLARE(ModelComponent);
-ECS_COMPONENT_DECLARE(PlayerInput_T);
+
+typedef struct {
+    ecs_entity_t id;  // Entity to edit (e.g., cube with CubeWire)
+    int selectedIndex; // Index of the selected entity in the list
+    // Later: Add fields for other GUI controls
+} TransformGUI;
 ECS_COMPONENT_DECLARE(TransformGUI);
 
-// Helper function to update a single transform
+typedef struct {
+  bool isMovementMode;
+  bool tabPressed;
+  bool moveForward;
+  bool moveBackward;
+  bool moveLeft;
+  bool moveRight;
+} PlayerInput_T;
+ECS_COMPONENT_DECLARE(PlayerInput_T);
+
+void GUI_Transform3D_List_System(ecs_iter_t *it);
+
 // Helper function to update a single transform
 void UpdateTransform(ecs_world_t *world, ecs_entity_t entity, Transform3D *transform) {
   // Get parent entity
@@ -169,14 +192,14 @@ void UpdateChildOnlySystem(ecs_iter_t *it) {
 }
 
 // Render begin system
-void RLRenderDrawingSystem(ecs_iter_t *it) {
+void RenderBeginSystem(ecs_iter_t *it) {
   // printf("RenderBeginSystem\n");
   BeginDrawing();
   ClearBackground(RAYWHITE);
 }
 
 // Render begin system
-void RLBeginMode3DSystem(ecs_iter_t *it) {
+void BeginCamera3DSystem(ecs_iter_t *it) {
   // printf("BeginCamera3DSystem\n");
   Camera3D *camera = (Camera3D *)ecs_get_ctx(it->world);
   if (!camera) return;
@@ -184,7 +207,7 @@ void RLBeginMode3DSystem(ecs_iter_t *it) {
 }
 
 // Camera3d system for 3d model
-void RLRender3DSystem(ecs_iter_t *it) {
+void Camera3DSystem(ecs_iter_t *it) {
   Transform3D *t = ecs_field(it, Transform3D, 0);
   ModelComponent *m = ecs_field(it, ModelComponent, 1);
 
@@ -226,16 +249,15 @@ void RLRender3DSystem(ecs_iter_t *it) {
   // }
 }
 
-// RL EndMode3D
-void RLEndMode3DSystem(ecs_iter_t *it) {
-  //printf("RLEndMode3DSystem\n");
+void EndCamera3DSystem(ecs_iter_t *it) {
+  //printf("EndCamera3DSystem\n");
   Camera3D *camera = (Camera3D *)ecs_get_ctx(it->world);
   if (!camera) return;
   EndMode3D();
 }
 
-//  End Drawing system
-void RLEndDrawingSystem(ecs_iter_t *it) {
+// Render end system
+void EndRenderSystem(ecs_iter_t *it) {
   //printf("EndRenderSystem\n");
   EndDrawing();
 }
@@ -307,14 +329,13 @@ void user_input_system(ecs_iter_t *it) {
           }
           if (wasModified) {
             t[i].isDirty = true;
-            // printf("Marked %s as dirty\n", name);// this will update if move main node
+            printf("Marked %s as dirty\n", name);
           }
         }
       }
     }
 }
 
-// render 2d only
 void render2d_hud_system(ecs_iter_t *it){
   PlayerInput_T *pi_ctx = ecs_singleton_ensure(it->world, PlayerInput_T);
   if (!pi_ctx) return;
@@ -332,273 +353,37 @@ void render2d_hud_system(ecs_iter_t *it){
   DrawFPS(10, 70);
 }
 
-// ray cast
-void PickingSystem(ecs_iter_t *it){
+int main(void) {
+    InitWindow(800, 600, "Transform Hierarchy with Flecs v4.x");
+    SetTargetFPS(60);
 
-}
+    ecs_world_t *world = ecs_init();
 
-// select list base on transform3d component
-void GUI_Transform3D_List_System(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
-
-    for (int i = 0; i < it->count; i++) {
-        TransformGUI *gui = &guis[i];
-
-        // Create a query for all entities with Transform3D
-        ecs_query_t *query = ecs_query(it->world, {
-            .terms = {
-                { ecs_id(Transform3D) }
-            }
-        });
-
-        // Count entities to allocate buffer for names
-        int entity_count = 0;
-        ecs_iter_t transform_it = ecs_query_iter(it->world, query);
-        while (ecs_query_next(&transform_it)) {
-            entity_count += transform_it.count;
-        }
-
-        // Allocate buffers for entity names and IDs
-        ecs_entity_t *entity_ids = (ecs_entity_t *)RL_MALLOC(entity_count * sizeof(ecs_entity_t));
-        char **entity_names = (char **)RL_MALLOC(entity_count * sizeof(char *));
-        int index = 0;
-
-        // Populate entity names and IDs
-        transform_it = ecs_query_iter(it->world, query);
-        while (ecs_query_next(&transform_it)) {
-            for (int j = 0; j < transform_it.count; j++) {
-                const char *name = ecs_get_name(it->world, transform_it.entities[j]);
-                entity_names[index] = (char *)RL_MALLOC(256 * sizeof(char));
-                snprintf(entity_names[index], 256, "%s", name ? name : "(unnamed)");
-                entity_ids[index] = transform_it.entities[j];
-                // printf("Entity %d: %s (ID: %llu)\n", index, entity_names[index], (unsigned long long)entity_ids[index]);
-                index++;
-            }
-        }
-
-        // Create a single string for GuiListView (concatenate names with semicolons)
-        char *name_list = (char *)RL_MALLOC(entity_count * 256 * sizeof(char));
-        name_list[0] = '\0';
-        for (int j = 0; j < entity_count; j++) {
-            if (j > 0) strcat(name_list, ";");
-            strcat(name_list, entity_names[j]);
-        }
-        // printf("Name list: %s\n", name_list);
-
-        // Draw the list view on the left side
-        Rectangle list_rect = {560, 10, 240, 580};
-        int scroll_index = 0;
-        int prev_selected_index = gui->selectedIndex; // Store previous index for comparison
-
-        // Debug: Print current selected index before GuiListView
-        // printf("Before GuiListView - Current selectedIndex: %d\n", gui->selectedIndex);
-
-        GuiGroupBox(list_rect, "Entity List");
-        GuiListView(list_rect, name_list, &scroll_index, &gui->selectedIndex);
-
-        // Debug: Print gui->selectedIndex after GuiListView
-        // printf("After GuiListView - gui->selectedIndex: %d\n", gui->selectedIndex);
-
-        // Update TransformGUI.id if the selection changed
-        if (gui->selectedIndex >= 0 && gui->selectedIndex < entity_count && ecs_is_valid(it->world, entity_ids[gui->selectedIndex])) {
-            if (gui->id != entity_ids[gui->selectedIndex] || gui->selectedIndex != prev_selected_index) {
-                gui->id = entity_ids[gui->selectedIndex];
-                // printf("Selected entity: %s (ID: %llu), Index: %d\n",
-                //        entity_names[gui->selectedIndex],
-                //        (unsigned long long)gui->id,
-                //        gui->selectedIndex);
-            } else {
-                // printf("No change in selection: %s (ID: %llu), Index: %d\n",
-                //        entity_names[gui->selectedIndex],
-                //        (unsigned long long)gui->id,
-                //        gui->selectedIndex);
-            }
-        } else {
-            // printf("Invalid selection: selectedIndex=%d, entity_count=%d, valid=%d\n",
-            //        gui->selectedIndex, entity_count,
-            //        gui->selectedIndex < entity_count ? ecs_is_valid(it->world, entity_ids[gui->selectedIndex]) : 0);
-        }
-
-        // Clean up
-        for (int j = 0; j < entity_count; j++) {
-            RL_FREE(entity_names[j]);
-        }
-        RL_FREE(entity_names);
-        RL_FREE(entity_ids);
-        RL_FREE(name_list);
-
-        // Free the query
-        ecs_query_fini(query);
-    }
-}
-
-// transform 3d position, rotate, scale.
-void GUI_Transform3D_System(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);  // Field index 0
-
-    for (int i = 0; i < it->count; i++) {
-        TransformGUI *gui = &guis[i];
-
-        // Check if the referenced entity exists
-        if (!ecs_is_valid(it->world, gui->id)) {
-            // Disable GUI if entity doesn’t exist
-            continue;
-        }
-
-        Transform3D *transform = ecs_get_mut(it->world, gui->id, Transform3D);
-        if (transform) {
-            // Store original values to initialize sliders
-            float posX = transform->position.x;
-            float posY = transform->position.y;
-            float posZ = transform->position.z;
-            Vector3 euler = QuaternionToEuler(transform->rotation);
-            float rotX = RAD2DEG * euler.x;
-            float rotY = RAD2DEG * euler.y;
-            float rotZ = RAD2DEG * euler.z;
-            float scaleX = transform->scale.x;
-            float scaleY = transform->scale.y;
-            float scaleZ = transform->scale.z;
-
-            // Store slider input values
-            float newPosX = posX;
-            float newPosY = posY;
-            float newPosZ = posZ;
-            float newRotX = rotX;
-            float newRotY = rotY;
-            float newRotZ = rotZ;
-            float newScaleX = scaleX;
-            float newScaleY = scaleY;
-            float newScaleZ = scaleZ;
-
-            // Draw raygui controls for position, rotation, and scale
-            Rectangle panel = {4, 150, 258, 290};  // GUI panel position and size
-            GuiGroupBox(panel, "Transform Controls");
-
-            // Position controls
-            GuiLabel((Rectangle){20, 170, 100, 20}, "Position");
-            GuiSlider((Rectangle){20, 190, 220, 20}, "X", TextFormat("%.2f", posX), &newPosX, -10.0f, 10.0f);
-            GuiSlider((Rectangle){20, 210, 220, 20}, "Y", TextFormat("%.2f", posY), &newPosY, -10.0f, 10.0f);
-            GuiSlider((Rectangle){20, 230, 220, 20}, "Z", TextFormat("%.2f", posZ), &newPosZ, -10.0f, 10.0f);
-
-            // Rotation controls (display Euler angles, apply incremental quaternions)
-            GuiLabel((Rectangle){20, 260, 100, 20}, "Rotation (degrees)");
-            GuiSlider((Rectangle){20, 280, 220, 20}, "X", TextFormat("%.2f", rotX), &newRotX, -180.0f, 180.0f);
-            GuiSlider((Rectangle){20, 300, 220, 20}, "Y", TextFormat("%.2f", rotY), &newRotY, -180.0f, 180.0f);
-            GuiSlider((Rectangle){20, 320, 220, 20}, "Z", TextFormat("%.2f", rotZ), &newRotZ, -180.0f, 180.0f);
-
-            // Scale controls
-            GuiLabel((Rectangle){20, 350, 100, 20}, "Scale");
-            GuiSlider((Rectangle){20, 370, 220, 20}, "X", TextFormat("%.2f", scaleX), &newScaleX, 0.1f, 5.0f);
-            GuiSlider((Rectangle){20, 390, 220, 20}, "Y", TextFormat("%.2f", scaleY), &newScaleY, 0.1f, 5.0f);
-            GuiSlider((Rectangle){20, 410, 220, 20}, "Z", TextFormat("%.2f", scaleZ), &newScaleZ, 0.1f, 5.0f);
-
-            // Check if any slider values changed
-            bool changed = false;
-
-            // Update position
-            if (newPosX != posX || newPosY != posY || newPosZ != posZ) {
-                transform->position = (Vector3){newPosX, newPosY, newPosZ};
-                changed = true;
-            }
-
-            // Update rotations independently for each axis
-            bool changed_rot_x = fabs(newRotX - rotX) > 0.001f;
-            bool changed_rot_y = fabs(newRotY - rotY) > 0.001f;
-            bool changed_rot_z = fabs(newRotZ - rotZ) > 0.001f;
-
-            // Only one rotation axis can update at a time
-            if (newRotX != rotX) {
-                float deltaRotX = DEG2RAD * (newRotX - rotX);
-                Quaternion rotXQuat = QuaternionFromAxisAngle((Vector3){1, 0, 0}, deltaRotX);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotXQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("X rotation updated: delta=%.2f degrees\n", newRotX - rotX);
-            }
-            if (newRotY != rotY) {
-                float deltaRotY = DEG2RAD * (newRotY - rotY);
-                // float deltaRotY = DEG2RAD * newRotY;
-                Quaternion rotYQuat = QuaternionFromAxisAngle((Vector3){0, 1, 0}, deltaRotY);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotYQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("Y rotation updated: delta=%.2f degrees\n", newRotY - rotY);
-            }
-            if (newRotZ != rotZ) {
-                float deltaRotZ = DEG2RAD * (newRotZ - rotZ);
-                Quaternion rotZQuat = QuaternionFromAxisAngle((Vector3){0, 0, 1}, deltaRotZ);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotZQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("Z rotation updated: delta=%.2f degrees\n", newRotZ - rotZ);
-            }
-
-            // Update scale
-            if (newScaleX != scaleX || newScaleY != scaleY || newScaleZ != scaleZ) {
-                transform->scale = (Vector3){newScaleX, newScaleY, newScaleZ};
-                changed = true;
-            }
-
-            // Apply changes if any slider was modified
-            if (changed) {
-                transform->isDirty = true;
-                // ecs_modified_id(it->world, gui->id, ecs_id(Transform3D));
-
-                // Debug output to confirm changes
-                printf("GUI updated %s: Pos (%.2f, %.2f, %.2f), Rot (%.2f, %.2f, %.2f), Scale (%.2f, %.2f, %.2f)\n",
-                       ecs_get_name(it->world, gui->id) ? ecs_get_name(it->world, gui->id) : "(unnamed)",
-                       transform->position.x, transform->position.y, transform->position.z,
-                       newRotX, newRotY, newRotZ,
-                       transform->scale.x, transform->scale.y, transform->scale.z);
-            }
-        }
-    }
-}
-
-void setup_phases(ecs_world_t *world){
-    // Define custom phases
-    // ecs_entity_t PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLBeginDrawingPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender2D0Phase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLBeginMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLEndMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender2D1Phase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLEndDrawingPhase = ecs_new_w_id(world, EcsPhase);
-
-    PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    RLBeginDrawingPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender2D0Phase = ecs_new_w_id(world, EcsPhase);
-    RLBeginMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLEndMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender2D1Phase = ecs_new_w_id(world, EcsPhase);
-    RLEndDrawingPhase = ecs_new_w_id(world, EcsPhase);
-
-    // Order phases
-    ecs_add_pair(world, PreLogicUpdatePhase, EcsDependsOn, EcsPreUpdate);
-    ecs_add_pair(world, LogicUpdatePhase, EcsDependsOn, PreLogicUpdatePhase);
-    ecs_add_pair(world, RLBeginDrawingPhase, EcsDependsOn, LogicUpdatePhase);
-    ecs_add_pair(world, RLRender2D0Phase, EcsDependsOn, LogicUpdatePhase);
-    ecs_add_pair(world, RLBeginMode3DPhase, EcsDependsOn, RLRender2D0Phase);
-    ecs_add_pair(world, RLRender3DPhase, EcsDependsOn, RLBeginMode3DPhase);
-    ecs_add_pair(world, RLEndMode3DPhase, EcsDependsOn, RLRender3DPhase);
-    ecs_add_pair(world, RLRender2D1Phase, EcsDependsOn, RLEndMode3DPhase);
-    ecs_add_pair(world, RLEndDrawingPhase, EcsDependsOn, RLRender2D1Phase);
-}
-
-
-void setup_components(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, Transform3D);
     ECS_COMPONENT_DEFINE(world, ModelComponent);
     ECS_COMPONENT_DEFINE(world, PlayerInput_T);
     ECS_COMPONENT_DEFINE(world, TransformGUI);
-}
 
-void setup_systems(ecs_world_t *world){
-    // INPUT Current Entity transform3d
+    // Define custom phases
+    ecs_entity_t PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t BeginRenderPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t BeginCamera3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t Camera3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t EndCamera3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RenderPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t EndRenderPhase = ecs_new_w_id(world, EcsPhase);
+
+    // order phase not doing correct
+    ecs_add_pair(world, PreLogicUpdatePhase, EcsDependsOn, EcsPreUpdate); // start game logics
+    ecs_add_pair(world, LogicUpdatePhase, EcsDependsOn, PreLogicUpdatePhase); // start game logics
+    ecs_add_pair(world, BeginRenderPhase, EcsDependsOn, LogicUpdatePhase); // BeginDrawing
+    ecs_add_pair(world, BeginCamera3DPhase, EcsDependsOn, BeginRenderPhase); // EcsOnUpdate, BeginMode3D
+    ecs_add_pair(world, Camera3DPhase, EcsDependsOn, BeginCamera3DPhase); // 3d model only
+    ecs_add_pair(world, EndCamera3DPhase, EcsDependsOn, Camera3DPhase); // EndMode3D
+    ecs_add_pair(world, RenderPhase, EcsDependsOn, EndCamera3DPhase); // 2D only
+    ecs_add_pair(world, EndRenderPhase, EcsDependsOn, RenderPhase); // render to screen
+
     ecs_system_init(world, &(ecs_system_desc_t){
         .entity = ecs_entity(world, { .name = "user_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
         .query.terms = {
@@ -607,9 +392,8 @@ void setup_systems(ecs_world_t *world){
         .callback = user_input_system
     });
 
-    // ONLY 2D
     ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+      .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RenderPhase)) }),
       .query.terms = {
           { .id = ecs_id(Transform3D), .src.id = EcsSelf },
           { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
@@ -617,7 +401,6 @@ void setup_systems(ecs_world_t *world){
       .callback = render2d_hud_system
     });
 
-    // Transform Hierarchy
     ecs_system_init(world, &(ecs_system_desc_t){
       .entity = ecs_entity(world, {
           .name = "UpdateTransformHierarchySystem",
@@ -641,69 +424,293 @@ void setup_systems(ecs_world_t *world){
         .callback = UpdateChildOnlySystem
     });
 
-    // note this has be in order of the ECS since push into array.
-    // Render Begin System
     ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, { .name = "RenderBeginDrawingSystem", 
-        .add = ecs_ids(ecs_dependson(RLBeginDrawingPhase)) 
+      .entity = ecs_entity(world, { .name = "RenderBeginSystem", 
+        .add = ecs_ids(ecs_dependson(BeginRenderPhase)) 
       }),
-      .callback = RLRenderDrawingSystem
+      .callback = RenderBeginSystem
     });
 
-    // Begin Mode 3D camera System
+    //note this has be in order of the ECS since push into array. From I guess.
     ecs_system_init(world, &(ecs_system_desc_t){
       .entity = ecs_entity(world, {
-        .name = "BeginMode3DSystem", 
-        .add = ecs_ids(ecs_dependson(RLBeginMode3DPhase)) 
+        .name = "BeginCamera3DSystem", 
+        .add = ecs_ids(ecs_dependson(BeginCamera3DPhase)) 
       }),
-      .callback = RLBeginMode3DSystem
+      .callback = BeginCamera3DSystem
     });
 
-    // Camera 3D System
     ecs_system_init(world, &(ecs_system_desc_t){
         .entity = ecs_entity(world, {
-          .name = "RLRender3DSystem", 
-          .add = ecs_ids(ecs_dependson(RLRender3DPhase))
+          .name = "Camera3DSystem", 
+          .add = ecs_ids(ecs_dependson(Camera3DPhase))
         }),
         .query.terms = {
             { .id = ecs_id(Transform3D), .src.id = EcsSelf },
             { .id = ecs_id(ModelComponent), .src.id = EcsSelf }
         },
-        .callback = RLRender3DSystem
+        .callback = Camera3DSystem
     });
 
-    // End Camera 3D System
     ecs_system_init(world, &(ecs_system_desc_t){
       .entity = ecs_entity(world, {
-        .name = "RLEndMode3DSystem", 
-        .add = ecs_ids(ecs_dependson(RLEndMode3DPhase))
+        .name = "EndCamera3DSystem", 
+        .add = ecs_ids(ecs_dependson(EndCamera3DPhase))
       }),
-      .callback = RLEndMode3DSystem
+      .callback = EndCamera3DSystem
     });
 
-    // End Render gl System
     ecs_system_init(world, &(ecs_system_desc_t){
         .entity = ecs_entity(world, {
-          .name = "EndDrawingSystem", 
-          .add = ecs_ids(ecs_dependson(RLEndDrawingPhase)) 
+          .name = "EndRenderSystem", 
+          .add = ecs_ids(ecs_dependson(EndRenderPhase)) 
         }),
-        .callback = RLEndDrawingSystem
+        .callback = EndRenderSystem
     });
 
-    // Register GUI system in the 2D rendering phase
-    ECS_SYSTEM(world, GUI_Transform3D_System, RLRender2D1Phase, TransformGUI);
+    Camera3D camera = {
+        .position = (Vector3){10.0f, 10.0f, 10.0f},
+        .target = (Vector3){0.0f, 0.0f, 0.0f},
+        .up = (Vector3){0.0f, 1.0f, 0.0f},
+        .fovy = 45.0f,
+        .projection = CAMERA_PERSPECTIVE
+    };
+    ecs_set_ctx(world, &camera, NULL);
+
+    ecs_singleton_set(world, PlayerInput_T, {
+      .isMovementMode=true,
+      .tabPressed=false
+    });
+
+    Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+
+    ecs_entity_t node1 = ecs_entity(world, {
+      .name = "NodeParent"
+    });
+
+    ecs_set(world, node1, Transform3D, {
+        .position = (Vector3){0.0f, 0.0f, 0.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){1.0f, 1.0f, 1.0f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node1, ModelComponent, {&cube});
+    // printf("Node1 entity ID: %llu (%s)\n", (unsigned long long)node1, ecs_get_name(world, node1));
+    // printf("- Node1 valid: %d, has Transform3D: %d\n", ecs_is_valid(world, node1), ecs_has(world, node1, Transform3D));
+    
+    ecs_entity_t node2 = ecs_entity(world, {
+        .name = "NodeChild",
+        .parent = node1
+    });
+    ecs_set(world, node2, Transform3D, {
+        .position = (Vector3){2.0f, 0.0f, 0.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node2, ModelComponent, {&cube});
+    // printf("Node2 entity ID: %llu (%s)\n", (unsigned long long)node2, ecs_get_name(world, node2));
+    // printf("- Node2 valid: %d, has Transform3D: %d, parent: %s\n",
+    //        ecs_is_valid(world, node2), ecs_has(world, node2, Transform3D),
+    //        ecs_get_name(world, ecs_get_parent(world, node2)));
+    
+    ecs_entity_t node3 = ecs_entity(world, {
+        .name = "Node3",
+        .parent = node1
+    });
+    ecs_set(world, node3, Transform3D, {
+        .position = (Vector3){2.0f, 0.0f, 2.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node3, ModelComponent, {&cube});
+    // printf("Node3 entity ID: %llu (%s)\n", (unsigned long long)node3, ecs_get_name(world, node3));
+    // printf("- Node3 valid: %d, has Transform3D: %d, parent: %s\n",
+    //      ecs_is_valid(world, node3), ecs_has(world, node3, Transform3D),
+    //      ecs_get_name(world, ecs_get_parent(world, node3)));
+
+
+    ecs_entity_t node4 = ecs_entity(world, {
+        .name = "NodeGrandchild",
+        .parent = node2
+    });
+    ecs_set(world, node4, Transform3D, {
+        .position = (Vector3){1.0f, 0.0f, 1.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node4, ModelComponent, {&cube});
+    // printf("Node4 entity ID: %llu (%s)\n", (unsigned long long)node4, ecs_get_name(world, node4));
+    // printf("- Node4 valid: %d, has Transform3D: %d, parent: %s\n",
+    //        ecs_is_valid(world, node4), ecs_has(world, node4, Transform3D),
+    //        ecs_get_name(world, ecs_get_parent(world, node4)));
+
+    ecs_entity_t gui = ecs_new(world);
+    ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
+    ecs_set(world, gui, TransformGUI, {
+        .id = node1  // Reference the id entity
+    });
 
     // Register GUI list system in the 2D rendering phase
-    ECS_SYSTEM(world, GUI_Transform3D_List_System, RLRender2D1Phase, TransformGUI);
+    ECS_SYSTEM(world, GUI_Transform3D_List_System, EcsOnUpdate, TransformGUI);
 
+    while (!WindowShouldClose()) {
+      ecs_progress(world, 0);
+    }
+
+    UnloadModel(cube);
+    ecs_fini(world);
+    CloseWindow();
+    return 0;
 }
 
-// Initialize Raylib-related components and phases
-void module_init_raylib(ecs_world_t *world) {
-    //phases
-    setup_phases(world);
-    // Define components
-    setup_components(world);
-    //systems
-    setup_systems(world);
+void GUI_Transform3D_List_System(ecs_iter_t *it) {
+    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
+
+    for (int i = 0; i < it->count; i++) {
+        TransformGUI *gui = &guis[i];
+
+        // Create a query for all entities with Transform3D
+        ecs_query_t *query = ecs_query(it->world, {
+            .terms = {{ ecs_id(Transform3D) }}
+        });
+
+        int entity_count = 0;
+        ecs_iter_t transform_it = ecs_query_iter(it->world, query);
+        while (ecs_query_next(&transform_it)) {
+            entity_count += transform_it.count;
+        }
+
+        // Allocate buffers for entity names and IDs
+        ecs_entity_t *entity_ids = (ecs_entity_t *)RL_MALLOC(entity_count * sizeof(ecs_entity_t));
+        char **entity_names = (char **)RL_MALLOC(entity_count * sizeof(char *));
+        int index = 0;
+
+        // Populate entity names and IDs
+        transform_it = ecs_query_iter(it->world, query);
+        while (ecs_query_next(&transform_it)) {
+            for (int j = 0; j < transform_it.count; j++) {
+                const char *name = ecs_get_name(it->world, transform_it.entities[j]);
+                entity_names[index] = (char *)RL_MALLOC(256 * sizeof(char));
+                snprintf(entity_names[index], 256, "%s", name ? name : "(unnamed)");
+                entity_ids[index] = transform_it.entities[j];
+                index++;
+            }
+        }
+
+        // Create a single string for GuiListView
+        char *name_list = (char *)RL_MALLOC(entity_count * 256 * sizeof(char));
+        name_list[0] = '\0';
+        for (int j = 0; j < entity_count; j++) {
+            if (j > 0) strcat(name_list, ";");
+            strcat(name_list, entity_names[j]);
+        }
+
+        // Draw the list view on the right side
+        Rectangle list_rect = {520, 10, 240, 200}; // Reduced height for more controls
+        int scroll_index = 0;
+        GuiGroupBox(list_rect, "Entity List");
+        int prev_selected_index = gui->selectedIndex;
+        GuiListView(list_rect, name_list, &scroll_index, &gui->selectedIndex);
+
+        // Draw transform controls if an entity is selected
+        if (gui->selectedIndex >= 0 && gui->selectedIndex < entity_count && ecs_is_valid(it->world, entity_ids[gui->selectedIndex])) {
+            gui->id = entity_ids[gui->selectedIndex];
+            Transform3D *transform = ecs_get_mut(it->world, gui->id, Transform3D);
+            bool modified = false;
+
+            if (transform) {
+                Rectangle control_rect = {520, 220, 240, 360};
+                GuiGroupBox(control_rect, "Transform Controls");
+
+                // Position controls
+                GuiLabel((Rectangle){530, 230, 100, 20}, "Position");
+                float new_pos_x = transform->position.x;
+                float new_pos_y = transform->position.y;
+                float new_pos_z = transform->position.z;
+                GuiSlider((Rectangle){530, 250, 200, 20}, "X", TextFormat("%.2f", new_pos_x), &new_pos_x, -10.0f, 10.0f);
+                GuiSlider((Rectangle){530, 270, 200, 20}, "Y", TextFormat("%.2f", new_pos_y), &new_pos_y, -10.0f, 10.0f);
+                GuiSlider((Rectangle){530, 290, 200, 20}, "Z", TextFormat("%.2f", new_pos_z), &new_pos_z, -10.0f, 10.0f);
+                if (new_pos_x != transform->position.x || new_pos_y != transform->position.y || new_pos_z != transform->position.z) {
+                    transform->position.x = new_pos_x;
+                    transform->position.y = new_pos_y;
+                    transform->position.z = new_pos_z;
+                    modified = true;
+                }
+
+                // Rotation controls (using Euler angles)
+                GuiLabel((Rectangle){530, 310, 100, 20}, "Rotation");
+                Vector3 euler = QuaternionToEuler(transform->rotation);
+                euler.x = RAD2DEG * euler.x;
+                euler.y = RAD2DEG * euler.y;
+                euler.z = RAD2DEG * euler.z;
+                float new_rot_x = euler.x;
+                float new_rot_y = euler.y;
+                float new_rot_z = euler.z;
+                GuiSlider((Rectangle){530, 330, 200, 20}, "X", TextFormat("%.2f", new_rot_x), &new_rot_x, -180.0f, 180.0f);
+                GuiSlider((Rectangle){530, 350, 200, 20}, "Y", TextFormat("%.2f", new_rot_y), &new_rot_y, -180.0f, 180.0f);
+                GuiSlider((Rectangle){530, 370, 200, 20}, "Z", TextFormat("%.2f", new_rot_z), &new_rot_z, -180.0f, 180.0f);
+                if (new_rot_x != euler.x || new_rot_y != euler.y || new_rot_z != euler.z) {
+                    transform->rotation = QuaternionFromEuler(DEG2RAD * new_rot_x, DEG2RAD * new_rot_y, DEG2RAD * new_rot_z);
+                    modified = true;
+                }
+
+                // Scale controls
+                GuiLabel((Rectangle){530, 390, 100, 20}, "Scale");
+                float new_scale_x = transform->scale.x;
+                float new_scale_y = transform->scale.y;
+                float new_scale_z = transform->scale.z;
+                GuiSlider((Rectangle){530, 410, 200, 20}, "X", TextFormat("%.2f", new_scale_x), &new_scale_x, 0.1f, 5.0f);
+                GuiSlider((Rectangle){530, 430, 200, 20}, "Y", TextFormat("%.2f", new_scale_y), &new_scale_y, 0.1f, 5.0f);
+                GuiSlider((Rectangle){530, 450, 200, 20}, "Z", TextFormat("%.2f", new_scale_z), &new_scale_z, 0.1f, 5.0f);
+                if (new_scale_x != transform->scale.x || new_scale_y != transform->scale.y || new_scale_z != transform->scale.z) {
+                    transform->scale.x = new_scale_x;
+                    transform->scale.y = new_scale_y;
+                    transform->scale.z = new_scale_z;
+                    modified = true;
+                }
+
+                // Mark transform and descendants as dirty if modified
+                if (modified) {
+                    transform->isDirty = true;
+                    UpdateChildTransformOnly(it->world, gui->id); // Update child and descendants immediately
+                    // ecs_modified(it->world, gui->id, Transform3D);
+
+                    // Mark all descendants as dirty
+                    ecs_iter_t child_it = ecs_children(it->world, gui->id);
+                    while (ecs_children_next(&child_it)) {
+                        for (int j = 0; j < child_it.count; j++) {
+                            if (ecs_has(child_it.world, child_it.entities[j], Transform3D)) {
+                                Transform3D *child_transform = ecs_get_mut(child_it.world, child_it.entities[j], Transform3D);
+                                if (child_transform) {
+                                    child_transform->isDirty = true;
+                                    ecs_modified(child_it.world, child_it.entities[j], Transform3D);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clean up
+        for (int j = 0; j < entity_count; j++) {
+            RL_FREE(entity_names[j]);
+        }
+        RL_FREE(entity_names);
+        RL_FREE(entity_ids);
+        RL_FREE(name_list);
+        ecs_query_fini(query);
+    }
 }
+

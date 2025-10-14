@@ -1,14 +1,77 @@
 cmake_minimum_required(VERSION 3.15)
-project(raylib_cimgui_lua)
+project(raylib_module_c LANGUAGES C CXX)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
+    file(DOWNLOAD
+        "https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake"
+        "${CMAKE_BINARY_DIR}/cmake/CPM.cmake"
+    )
+endif()
+include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+
 include(FetchContent)
 
 # Find OpenGL
 find_package(OpenGL REQUIRED)
+
+FetchContent_Declare(
+    ode
+    GIT_REPOSITORY https://bitbucket.org/odedevs/ode.git
+    GIT_TAG        0.16.6
+    # EXCLUDE_FROM_ALL #this disable build?
+    # GIT_SHALLOW TRUE
+    # USES_TERMINAL_DOWNLOAD TRUE
+)
+
+set(ODE_WITH_DEMOS OFF CACHE BOOL "" FORCE)
+set(ODE_WITH_TESTS OFF CACHE BOOL "" FORCE)
+set(ODE_DOUBLE_PRECISION ON CACHE BOOL "" FORCE) # Explicitly enable double precision
+set(ODE_SHARED ON CACHE BOOL "" FORCE) # Build as shared library (DLL)
+FetchContent_MakeAvailable(ode)
+# Modified (safer)
+
+target_link_options(ODE PRIVATE
+    -static-libgcc                                  # GNU Compiler Collection
+    -static-libstdc++                               # Uncomment if C++ code is used
+    -static                                         # Avoid full static linking to prevent issues with system libraries
+)
+
+
+# ODE (Open Dynamics Engine) - Add first to avoid uninstall target conflict
+# CPMAddPackage(
+#     NAME ode
+#     GIT_REPOSITORY https://bitbucket.org/odedevs/ode.git
+#     GIT_TAG 0.16.6
+#     OPTIONS
+#         "ODE_BUILD_EXAMPLES OFF"
+#         "ODE_BUILD_DEMOS OFF"
+#         "ODE_BUILD_TESTS OFF"
+#         "ODE_DOUBLE_PRECISION ON"  # Explicitly enable double precision
+#         "ODE_SHARED ON"            # Build as shared library (DLL)
+# )
+
+# if(ODE_DOUBLE_PRECISION)
+# 	set(CCD_PRECISION CCD_DOUBLE)
+# 	set(ODE_PRECISION dDOUBLE)
+# else()
+# 	set(CCD_PRECISION CCD_SINGLE)
+# 	set(ODE_PRECISION dSINGLE)
+# endif()
+# configure_file(${ode_SOURCE_DIR}/libccd/src/ccd/precision.h.in ${ode_SOURCE_DIR}/include/ccd/precision.h)
+# configure_file(${ode_SOURCE_DIR}/include/ode/precision.h.in ${ode_SOURCE_DIR}/include/ode/precision.h)
+# set(ODE_VERSION_MAJOR 0)
+# set(ODE_VERSION_MINOR 16)
+# set(ODE_VERSION_PATCH 6)
+# set(_ODE_VERSION ${ODE_VERSION_MAJOR}.${ODE_VERSION_MINOR}.${ODE_VERSION_PATCH})
+# set(ODE_VERSION ${_ODE_VERSION})
+# configure_file(${ode_SOURCE_DIR}/include/ode/version.h.in ${ode_SOURCE_DIR}/include/ode/version.h)
+
 
 # Fetch raylib
 FetchContent_Declare(
@@ -161,10 +224,18 @@ FetchContent_MakeAvailable(cglm)
 # FetchContent_MakeAvailable(stb)
 
 
+# Now add your target, and optionally a unified uninstall
+# if(NOT TARGET uninstall)
+#     add_custom_target(uninstall
+#         COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_BINARY_DIR}/cmake_uninstall.cmake"
+#     )
+# endif()
+
 #================================================
 # Application
 #================================================
-set(EXPORT_APP ON) #ON OFF bool
+# set(EXPORT_APP ON) #ON OFF bool
+set(EXPORT_APP OFF) #ON OFF bool
 if(${EXPORT_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
@@ -173,24 +244,27 @@ if(${EXPORT_APP})
         # src/module_lua.c                                # lua
         # src/module_enet.c                               # enet
         # src/module_raylib.c                             # raylib
-        # src/drawcube.c                             # raylib
+        # src/drawcube.c                                    # raylib
     )
 
     add_executable(${APP_NAME}
         icon.rc
         # ${SRC_FILES}
         # src/main.c
-
-
         # examples/flecs_id.c
         # examples/example_window.c
         # examples/rl_flecs_test01.c
         # examples/rl_flecs_test02.c
         # examples/rl_flecs_test03.c
         # examples/rl_flecs_test02.c
+        # examples/raylib3d_flecs_transform_hierarchy07_gui.c
+        # examples/raylib3d_flecs_transform_hierarchy08_gui.c
+        examples/raylib3d_flecs_transform_hierarchy09_gui.c # clean up to simple.
         # examples/raylib3d_flecs_transform_hierarchy07.c
         # examples/raylib3d_flecs_transform_hierarchy08.c
-        examples/rl_flecs_camera3d.c 
+        # examples/raylib3d_flecs_transform_hierarchy10.c
+        # examples/raylib3d_flecs_transform_hierarchy11.c
+        # examples/rl_flecs_camera3d.c 
         # examples/raylib_raycast_picking01.c 
         
         # src/example_raygui.c
@@ -247,23 +321,28 @@ if(${EXPORT_APP})
 endif()
 
 set(EXPORT_FLECS_APP ON)
+# set(EXPORT_FLECS_APP OFF)
 
 if(${EXPORT_FLECS_APP})
     message(STATUS "EXPORT FLECS APP")
-    set(APP_FLECS_NAME rlf)
-
+    set(APP_FLECS_NAME rlm)
     add_executable(${APP_FLECS_NAME}
-        src/main.c
+        src/ecs_components.c
+        src/module_dev.c
+        src/module_enet.c
+        # src/main.c
+        src/main_enet_test.c
+        # src/raylib_physics_ode.c
+        # src/raylib_flecs_ode_gui.c
     )
-
     # Link application with custom_cimgui
     target_link_libraries(${APP_FLECS_NAME} PRIVATE 
         raylib                                          # raylib
-        # lua                                             # lua
+        # lua                                           # lua
         flecs                                           # flecs
         cglm                                            # cglm
+        ODE                                             # ode must be cap from ode repo cmake config
     )
-
     # Include directories for the application
     target_include_directories(${APP_FLECS_NAME} PUBLIC
         ${PROJECT_SOURCE_DIR}/include                       # include
@@ -274,17 +353,79 @@ if(${EXPORT_FLECS_APP})
         # ${stb_SOURCE_DIR}                                 # stb
         ${raygui_SOURCE_DIR}/src                            # raygui
         ${cglm_SOURCE_DIR}/include                          # clgm
+        # ${ode_SOURCE_DIR}/include                          # 
+        ${ode_BINARY_DIR}/include                          # 
     )
     # Windows-specific settings
     if(WIN32)
         # ws2_32 # network
-        target_link_libraries(${APP_FLECS_NAME} PRIVATE ws2_32 gdi32 user32 shell32)
+        target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+            ws2_32                                          # Winsock 2
+            gdi32                                           # Graphics Device Interface
+            user32                                          # Windows user interface
+            shell32                                         # Windows Shell
+        )
         # target_link_options(${APP_NAME} PRIVATE -static-libgcc)
-
         target_link_options(${APP_FLECS_NAME} PRIVATE
-            -static-libgcc
-            -static-libstdc++  # Uncomment if C++ code is used
-            -static           # Avoid full static linking to prevent issues with system libraries
+            -static-libgcc                                  # GNU Compiler Collection
+            -static-libstdc++                               # Uncomment if C++ code is used
+            -static                                         # Avoid full static linking to prevent issues with system libraries
         )
     endif()
 endif()
+
+
+
+
+
+# # Define the list of example source files
+# set(examples
+#     # src/main01.c
+#     # src/main02.c
+#     src/raylib_physics_ode.c  # Include your physics test file
+# )
+
+# # Loop over each example to create separate executables
+# foreach(example ${examples})
+#     # Extract the filename without extension to use as the executable name
+#     get_filename_component(example_name ${example} NAME_WE)
+#     set(APP_FLECS_NAME "rlm_${example_name}")  # e.g., rlm_main01, rlm_main02
+
+#     # Create executable for the current example
+#     add_executable(${APP_FLECS_NAME} ${example})
+
+#     # Link application with libraries
+#     target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+#         raylib          # raylib
+#         flecs           # flecs
+#         cglm            # cglm
+#         ode             # ode
+#     )
+
+#     # Include directories for the application
+#     target_include_directories(${APP_FLECS_NAME} PUBLIC
+#         ${PROJECT_SOURCE_DIR}/include                       # project include
+#         ${raylib_SOURCE_DIR}/src                            # raylib include
+#         ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+#         ${raygui_SOURCE_DIR}/src                            # raygui
+#         ${cglm_SOURCE_DIR}/include                          # cglm
+#         ${ode_SOURCE_DIR}/include                           # ode
+#     )
+
+#     # Windows-specific settings
+#     if(WIN32)
+#         target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+#             ws2_32      # Winsock 2
+#             gdi32       # Graphics Device Interface
+#             user32      # Windows user interface
+#             shell32     # Windows Shell
+#         )
+#         target_link_options(${APP_FLECS_NAME} PRIVATE
+#             -static-libgcc      # GNU Compiler Collection
+#             -static-libstdc++   # Uncommented since you might use C++ with cglm/flecs
+#             -static             # Avoid full static linking
+#         )
+#     endif()
+# endforeach()
+
+# message(STATUS "EXPORT FLECS APPS")

@@ -1,28 +1,54 @@
-// ecs components
-
-// ecs_components.c
-#include "ecs_components.h"
+// raylib 5.5
+// flecs v4.1.1
+// strange rotation for gui
+// y -85 to 85 is cap else it will have strange rotate.
+// note that child does not update the changes. which need parent to update.
 #include <stdio.h>
+#include "raylib.h"
+#include "raymath.h"
+#include "flecs.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-// Define global phase entities
-ecs_entity_t PreLogicUpdatePhase = 0;
-ecs_entity_t LogicUpdatePhase = 0;
-ecs_entity_t RLBeginDrawingPhase = 0;
-ecs_entity_t RLRender2D0Phase = 0;
-ecs_entity_t RLBeginMode3DPhase = 0;
-ecs_entity_t RLRender3DPhase = 0;
-ecs_entity_t RLEndMode3DPhase = 0;
-ecs_entity_t RLRender2D1Phase = 0;
-ecs_entity_t RLEndDrawingPhase = 0;
-
+// Transform3D component
+typedef struct {
+    Vector3 position;         // Local position
+    Quaternion rotation;      // Local rotation
+    Vector3 scale;            // Local scale
+    Matrix localMatrix;       // Local transform matrix
+    Matrix worldMatrix;       // World transform matrix
+    bool isDirty;             // Flag to indicate if transform needs updating
+} Transform3D;
 ECS_COMPONENT_DECLARE(Transform3D);
+
+// Pointer component for raylib Model
+typedef struct {
+    Model* model;             // Pointer to Model
+} ModelComponent;
 ECS_COMPONENT_DECLARE(ModelComponent);
+
+typedef struct {
+  bool isMovementMode;
+  bool tabPressed;
+  bool moveForward;
+  bool moveBackward;
+  bool moveLeft;
+  bool moveRight;
+} PlayerInput_T;
 ECS_COMPONENT_DECLARE(PlayerInput_T);
+
+typedef struct {
+    ecs_entity_t id;  // Entity to edit (e.g., cube with CubeWire)
+    int selectedIndex; // Index of the selected entity in the list
+    // Later: Add fields for other GUI controls
+} TransformGUI;
 ECS_COMPONENT_DECLARE(TransformGUI);
 
-// Helper function to update a single transform
+// place holder debug
+void GUI_Transform3D_System(ecs_iter_t *it);
+void GUI_Transform3D_List_System(ecs_iter_t *it);
+void PickingSystem(ecs_iter_t *it);
+
 // Helper function to update a single transform
 void UpdateTransform(ecs_world_t *world, ecs_entity_t entity, Transform3D *transform) {
   // Get parent entity
@@ -113,19 +139,36 @@ void UpdateTransform(ecs_world_t *world, ecs_entity_t entity, Transform3D *trans
 void ProcessEntityHierarchy(ecs_world_t *world, ecs_entity_t entity) {
   // Update the current entity's transform
   Transform3D *transform = ecs_get_mut(world, entity, Transform3D);
+  bool wasUpdated = false;
   if (transform) {
-    // Only update if dirty or parent is dirty
-    ecs_entity_t parent = ecs_get_parent(world, entity);
-    bool parentIsDirty = false;
-    if (parent && ecs_is_valid(world, parent)) {
-      const Transform3D *parent_transform = ecs_get(world, parent, Transform3D);
-      if (parent_transform && parent_transform->isDirty) {
-        parentIsDirty = true;
+      // Only update if dirty or parent is dirty
+      ecs_entity_t parent = ecs_get_parent(world, entity);
+      bool parentIsDirty = false;
+      if (parent && ecs_is_valid(world, parent)) {
+          const Transform3D *parent_transform = ecs_get(world, parent, Transform3D);
+          if (parent_transform && parent_transform->isDirty) {
+              parentIsDirty = true;
+          }
       }
-    }
-    if (transform->isDirty || parentIsDirty) {
-      UpdateTransform(world, entity, transform);
-    }
+      if (transform->isDirty || parentIsDirty) {
+          UpdateTransform(world, entity, transform);
+          //ecs_set(world, entity, Transform3D, *transform); // Commit changes
+          wasUpdated = true;
+      }
+  }
+
+  // Skip processing children if this entity was not updated
+  if (!wasUpdated) {
+      return;
+  }
+
+  // Iterate through children
+  ecs_iter_t it = ecs_children(world, entity);
+  while (ecs_children_next(&it)) {
+      for (int i = 0; i < it.count; i++) {
+          ecs_entity_t child = it.entities[i];
+          ProcessEntityHierarchy(world, child); // Recursively process child
+      }
   }
 }
 
@@ -137,35 +180,6 @@ void UpdateTransformHierarchySystem(ecs_iter_t *it) {
       ecs_entity_t entity = it->entities[i];
       ProcessEntityHierarchy(it->world, entity);
   }
-}
-
-// Function to update a single entity and its descendants
-void UpdateChildTransformOnly(ecs_world_t *world, ecs_entity_t entity) {
-    Transform3D *transform = ecs_get_mut(world, entity, Transform3D);
-    if (!transform) return;
-
-    // Update the entity's transform
-    UpdateTransform(world, entity, transform);
-    ecs_modified(world, entity, Transform3D);
-
-    // Recursively update descendants
-    ecs_iter_t it = ecs_children(world, entity);
-    while (ecs_children_next(&it)) {
-        for (int i = 0; i < it.count; i++) {
-            UpdateChildTransformOnly(world, it.entities[i]);
-        }
-    }
-}
-
-// System to process specific child entities (e.g., triggered by GUI)
-void UpdateChildOnlySystem(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t entity = guis[i].id;
-        if (ecs_is_valid(it->world, entity) && ecs_has(it->world, entity, Transform3D)) {
-            UpdateChildTransformOnly(it->world, entity);
-        }
-    }
 }
 
 // Render begin system
@@ -330,6 +344,237 @@ void render2d_hud_system(ecs_iter_t *it){
   DrawText(pi_ctx->isMovementMode ? "Mode: Movement (WASD)" : "Mode: Rotation (QWE/ASD)", 10, 30, 20, DARKGRAY);
   DrawText("Tab: Toggle Mode | R: Reset", 10, 50, 20, DARKGRAY);
   DrawFPS(10, 70);
+}
+
+int main(void) {
+    InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
+    SetTargetFPS(60);
+
+    ecs_world_t *world = ecs_init();
+
+    ECS_COMPONENT_DEFINE(world, Transform3D);
+    ECS_COMPONENT_DEFINE(world, ModelComponent);
+    ECS_COMPONENT_DEFINE(world, PlayerInput_T);
+    ECS_COMPONENT_DEFINE(world, TransformGUI);
+
+    // Define custom phases
+    ecs_entity_t PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLBeginDrawingPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLRender2D0Phase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLBeginMode3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLRender3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLEndMode3DPhase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLRender2D1Phase = ecs_new_w_id(world, EcsPhase);
+    ecs_entity_t RLEndDrawingPhase = ecs_new_w_id(world, EcsPhase);
+
+    // order phase must be in order
+    ecs_add_pair(world, PreLogicUpdatePhase, EcsDependsOn, EcsPreUpdate); // start game logics
+    ecs_add_pair(world, LogicUpdatePhase, EcsDependsOn, PreLogicUpdatePhase); // start game logics
+    ecs_add_pair(world, RLBeginDrawingPhase, EcsDependsOn, LogicUpdatePhase); // BeginDrawing
+    ecs_add_pair(world, RLRender2D0Phase, EcsDependsOn, LogicUpdatePhase); // Render 2D 0
+    ecs_add_pair(world, RLBeginMode3DPhase, EcsDependsOn, RLRender2D0Phase); // EcsOnUpdate, BeginMode3D
+    ecs_add_pair(world, RLRender3DPhase, EcsDependsOn, RLBeginMode3DPhase); // 3d model only
+    ecs_add_pair(world, RLEndMode3DPhase, EcsDependsOn, RLRender3DPhase); // End Camera and EndMode3D
+    ecs_add_pair(world, RLRender2D1Phase, EcsDependsOn, RLEndMode3DPhase); // render 2D only
+    ecs_add_pair(world, RLEndDrawingPhase, EcsDependsOn, RLRender2D1Phase); // End render to screen
+
+    // INPUT Current Entity transform3d
+    ecs_system_init(world, &(ecs_system_desc_t){
+        .entity = ecs_entity(world, { .name = "user_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .query.terms = {
+            { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+        },
+        .callback = user_input_system
+    });
+
+    // ONLY 2D
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+      .query.terms = {
+          { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+          { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
+      },
+      .callback = render2d_hud_system
+    });
+
+    // Transform Hierarchy
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, {
+          .name = "UpdateTransformHierarchySystem",
+          .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase))
+      }),
+      .query.terms = {
+          { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+          { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot } // No parent
+      },
+      .callback = UpdateTransformHierarchySystem
+    });
+
+    // note this has be in order of the ECS since push into array.
+    // Render Begin System
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, { .name = "RenderBeginDrawingSystem", 
+        .add = ecs_ids(ecs_dependson(RLBeginDrawingPhase)) 
+      }),
+      .callback = RLRenderDrawingSystem
+    });
+
+    // Begin Mode 3D camera System
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, {
+        .name = "BeginMode3DSystem", 
+        .add = ecs_ids(ecs_dependson(RLBeginMode3DPhase)) 
+      }),
+      .callback = RLBeginMode3DSystem
+    });
+
+    // Camera 3D System
+    ecs_system_init(world, &(ecs_system_desc_t){
+        .entity = ecs_entity(world, {
+          .name = "RLRender3DSystem", 
+          .add = ecs_ids(ecs_dependson(RLRender3DPhase))
+        }),
+        .query.terms = {
+            { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+            { .id = ecs_id(ModelComponent), .src.id = EcsSelf }
+        },
+        .callback = RLRender3DSystem
+    });
+
+    // End Camera 3D System
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, {
+        .name = "RLEndMode3DSystem", 
+        .add = ecs_ids(ecs_dependson(RLEndMode3DPhase))
+      }),
+      .callback = RLEndMode3DSystem
+    });
+
+    // End Render gl System
+    ecs_system_init(world, &(ecs_system_desc_t){
+        .entity = ecs_entity(world, {
+          .name = "EndDrawingSystem", 
+          .add = ecs_ids(ecs_dependson(RLEndDrawingPhase)) 
+        }),
+        .callback = RLEndDrawingSystem
+    });
+
+    // setup Camera 3D
+    Camera3D camera = {
+        .position = (Vector3){10.0f, 10.0f, 10.0f},
+        .target = (Vector3){0.0f, 0.0f, 0.0f},
+        .up = (Vector3){0.0f, 1.0f, 0.0f},
+        .fovy = 45.0f,
+        .projection = CAMERA_PERSPECTIVE
+    };
+    ecs_set_ctx(world, &camera, NULL);
+
+    // setup Input
+    ecs_singleton_set(world, PlayerInput_T, {
+      .isMovementMode=true,
+      .tabPressed=false
+    });
+
+    // create Model
+    Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+
+    // Create Entity
+    ecs_entity_t node1 = ecs_entity(world, {
+      .name = "NodeParent"
+    });
+
+    ecs_set(world, node1, Transform3D, {
+        .position = (Vector3){0.0f, 0.0f, 0.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){1.0f, 1.0f, 1.0f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node1, ModelComponent, {&cube});
+    // printf("Node1 entity ID: %llu (%s)\n", (unsigned long long)node1, ecs_get_name(world, node1));
+    // printf("- Node1 valid: %d, has Transform3D: %d\n", ecs_is_valid(world, node1), ecs_has(world, node1, Transform3D));
+    
+    // Create Entity to parent to NodeParent
+    ecs_entity_t node2 = ecs_entity(world, {
+        .name = "NodeChild",
+        .parent = node1
+    });
+    ecs_set(world, node2, Transform3D, {
+        .position = (Vector3){2.0f, 0.0f, 0.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node2, ModelComponent, {&cube});
+    // printf("Node2 entity ID: %llu (%s)\n", (unsigned long long)node2, ecs_get_name(world, node2));
+    // printf("- Node2 valid: %d, has Transform3D: %d, parent: %s\n",
+    //        ecs_is_valid(world, node2), ecs_has(world, node2, Transform3D),
+    //        ecs_get_name(world, ecs_get_parent(world, node2)));
+    
+    // Create Entity to parent to NodeParent
+    ecs_entity_t node3 = ecs_entity(world, {
+        .name = "Node3",
+        .parent = node1
+    });
+    ecs_set(world, node3, Transform3D, {
+        .position = (Vector3){2.0f, 0.0f, 2.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node3, ModelComponent, {&cube});
+    // printf("Node3 entity ID: %llu (%s)\n", (unsigned long long)node3, ecs_get_name(world, node3));
+    // printf("- Node3 valid: %d, has Transform3D: %d, parent: %s\n",
+    //      ecs_is_valid(world, node3), ecs_has(world, node3, Transform3D),
+    //      ecs_get_name(world, ecs_get_parent(world, node3)));
+
+    // Create Entity to parent to NodeChild
+    ecs_entity_t node4 = ecs_entity(world, {
+        .name = "NodeGrandchild",
+        .parent = node2
+    });
+    ecs_set(world, node4, Transform3D, {
+        .position = (Vector3){1.0f, 0.0f, 1.0f},
+        .rotation = QuaternionIdentity(),
+        .scale = (Vector3){0.5f, 0.5f, 0.5f},
+        .localMatrix = MatrixIdentity(),
+        .worldMatrix = MatrixIdentity(),
+        .isDirty = true
+    });
+    ecs_set(world, node4, ModelComponent, {&cube});
+    // printf("Node4 entity ID: %llu (%s)\n", (unsigned long long)node4, ecs_get_name(world, node4));
+    // printf("- Node4 valid: %d, has Transform3D: %d, parent: %s\n",
+    //        ecs_is_valid(world, node4), ecs_has(world, node4, Transform3D),
+    //        ecs_get_name(world, ecs_get_parent(world, node4)));
+
+
+    ecs_entity_t gui = ecs_new(world);
+    ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
+    ecs_set(world, gui, TransformGUI, {
+        .id = node1  // Reference the id entity
+    });
+
+    // Register GUI system in the 2D rendering phase
+    ECS_SYSTEM(world, GUI_Transform3D_System, RLRender2D1Phase, TransformGUI);
+
+    // Register GUI list system in the 2D rendering phase
+    ECS_SYSTEM(world, GUI_Transform3D_List_System, RLRender2D1Phase, TransformGUI);
+
+    //Loop Logic and render
+    while (!WindowShouldClose()) {
+      ecs_progress(world, 0);
+    }
+
+    UnloadModel(cube);
+    ecs_fini(world);
+    CloseWindow();
+    return 0;
 }
 
 // ray cast
@@ -555,155 +800,3 @@ void GUI_Transform3D_System(ecs_iter_t *it) {
     }
 }
 
-void setup_phases(ecs_world_t *world){
-    // Define custom phases
-    // ecs_entity_t PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLBeginDrawingPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender2D0Phase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLBeginMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLEndMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLRender2D1Phase = ecs_new_w_id(world, EcsPhase);
-    // ecs_entity_t RLEndDrawingPhase = ecs_new_w_id(world, EcsPhase);
-
-    PreLogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    LogicUpdatePhase = ecs_new_w_id(world, EcsPhase);
-    RLBeginDrawingPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender2D0Phase = ecs_new_w_id(world, EcsPhase);
-    RLBeginMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLEndMode3DPhase = ecs_new_w_id(world, EcsPhase);
-    RLRender2D1Phase = ecs_new_w_id(world, EcsPhase);
-    RLEndDrawingPhase = ecs_new_w_id(world, EcsPhase);
-
-    // Order phases
-    ecs_add_pair(world, PreLogicUpdatePhase, EcsDependsOn, EcsPreUpdate);
-    ecs_add_pair(world, LogicUpdatePhase, EcsDependsOn, PreLogicUpdatePhase);
-    ecs_add_pair(world, RLBeginDrawingPhase, EcsDependsOn, LogicUpdatePhase);
-    ecs_add_pair(world, RLRender2D0Phase, EcsDependsOn, LogicUpdatePhase);
-    ecs_add_pair(world, RLBeginMode3DPhase, EcsDependsOn, RLRender2D0Phase);
-    ecs_add_pair(world, RLRender3DPhase, EcsDependsOn, RLBeginMode3DPhase);
-    ecs_add_pair(world, RLEndMode3DPhase, EcsDependsOn, RLRender3DPhase);
-    ecs_add_pair(world, RLRender2D1Phase, EcsDependsOn, RLEndMode3DPhase);
-    ecs_add_pair(world, RLEndDrawingPhase, EcsDependsOn, RLRender2D1Phase);
-}
-
-
-void setup_components(ecs_world_t *world){
-    ECS_COMPONENT_DEFINE(world, Transform3D);
-    ECS_COMPONENT_DEFINE(world, ModelComponent);
-    ECS_COMPONENT_DEFINE(world, PlayerInput_T);
-    ECS_COMPONENT_DEFINE(world, TransformGUI);
-}
-
-void setup_systems(ecs_world_t *world){
-    // INPUT Current Entity transform3d
-    ecs_system_init(world, &(ecs_system_desc_t){
-        .entity = ecs_entity(world, { .name = "user_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
-        .query.terms = {
-            { .id = ecs_id(Transform3D), .src.id = EcsSelf },
-        },
-        .callback = user_input_system
-    });
-
-    // ONLY 2D
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
-      .query.terms = {
-          { .id = ecs_id(Transform3D), .src.id = EcsSelf },
-          { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
-      },
-      .callback = render2d_hud_system
-    });
-
-    // Transform Hierarchy
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, {
-          .name = "UpdateTransformHierarchySystem",
-          .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase))
-      }),
-      .query.terms = {
-          { .id = ecs_id(Transform3D), .src.id = EcsSelf },
-          { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot } // No parent
-      },
-      .callback = UpdateTransformHierarchySystem
-    });
-
-    ecs_system_init(world, &(ecs_system_desc_t){
-        .entity = ecs_entity(world, {
-            .name = "UpdateChildOnlySystem",
-            .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase))
-        }),
-        .query.terms = {
-            { .id = ecs_id(TransformGUI), .src.id = EcsSelf }
-        },
-        .callback = UpdateChildOnlySystem
-    });
-
-    // note this has be in order of the ECS since push into array.
-    // Render Begin System
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, { .name = "RenderBeginDrawingSystem", 
-        .add = ecs_ids(ecs_dependson(RLBeginDrawingPhase)) 
-      }),
-      .callback = RLRenderDrawingSystem
-    });
-
-    // Begin Mode 3D camera System
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, {
-        .name = "BeginMode3DSystem", 
-        .add = ecs_ids(ecs_dependson(RLBeginMode3DPhase)) 
-      }),
-      .callback = RLBeginMode3DSystem
-    });
-
-    // Camera 3D System
-    ecs_system_init(world, &(ecs_system_desc_t){
-        .entity = ecs_entity(world, {
-          .name = "RLRender3DSystem", 
-          .add = ecs_ids(ecs_dependson(RLRender3DPhase))
-        }),
-        .query.terms = {
-            { .id = ecs_id(Transform3D), .src.id = EcsSelf },
-            { .id = ecs_id(ModelComponent), .src.id = EcsSelf }
-        },
-        .callback = RLRender3DSystem
-    });
-
-    // End Camera 3D System
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, {
-        .name = "RLEndMode3DSystem", 
-        .add = ecs_ids(ecs_dependson(RLEndMode3DPhase))
-      }),
-      .callback = RLEndMode3DSystem
-    });
-
-    // End Render gl System
-    ecs_system_init(world, &(ecs_system_desc_t){
-        .entity = ecs_entity(world, {
-          .name = "EndDrawingSystem", 
-          .add = ecs_ids(ecs_dependson(RLEndDrawingPhase)) 
-        }),
-        .callback = RLEndDrawingSystem
-    });
-
-    // Register GUI system in the 2D rendering phase
-    ECS_SYSTEM(world, GUI_Transform3D_System, RLRender2D1Phase, TransformGUI);
-
-    // Register GUI list system in the 2D rendering phase
-    ECS_SYSTEM(world, GUI_Transform3D_List_System, RLRender2D1Phase, TransformGUI);
-
-}
-
-// Initialize Raylib-related components and phases
-void module_init_raylib(ecs_world_t *world) {
-    //phases
-    setup_phases(world);
-    // Define components
-    setup_components(world);
-    //systems
-    setup_systems(world);
-}
