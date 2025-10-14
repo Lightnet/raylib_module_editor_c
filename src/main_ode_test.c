@@ -1,11 +1,8 @@
 // raylib 5.5
 // flecs v4.1.1
 #define RAYGUI_IMPLEMENTATION
-#define ENET_IMPLEMENTATION
-
 #include <stdio.h>
 #include "ecs_components.h"
-#include "raylib.h"
 #include "module_dev.h"
 #include "module_enet.h"
 
@@ -30,35 +27,24 @@ int main(void) {
     };
     ecs_set_ctx(world, &camera, NULL);
 
-    // Initialize singletons with default values
-    ecs_singleton_set(world, NetworkConfig, {
-        .isNetwork = false,
-        .isServer = false,
+    ecs_entity_t networkEntity = ecs_new(world);
+    ecs_set(world, networkEntity, NetworkConfig, {
+        .isServer = true,  // Or false for client
         .port = 1234,
         .maxPeers = 32,
-        .address = "127.0.0.1"
+        .address = "localhost"  // For client
     });
-    ecs_singleton_set(world, NetworkState, {
-        .host = NULL,
-        .peer = NULL,
-        .serverStarted = false,
-        .clientConnected = false,
-        .isConnected = false,
-        .isServer = false
-    });
+    ecs_set(world, networkEntity, NetworkState, {0});  // Zeros: host=NULL, flags=false
 
     //Loop Logic and render
     while (!WindowShouldClose()) {
       ecs_progress(world, 0);
     }
 
-    // Cleanup
-
     // Cleanup: Add to end of main (before ecs_fini)
-    // NetworkState *state = ecs_singleton_get(world, NetworkState);
-    // if (state && state->host) {
-    //     enet_host_destroy(state->host);
-    //     enet_deinitialize();
+    // if (g_host) {
+    //   enet_host_destroy(g_host);
+    //   enet_deinitialize();
     // }
 
     ecs_fini(world);

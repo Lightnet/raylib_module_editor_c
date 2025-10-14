@@ -7,7 +7,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "flecs.h"
-#define RAYGUI_IMPLEMENTATION
+// #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 // Transform3D component
