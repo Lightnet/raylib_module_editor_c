@@ -473,9 +473,50 @@ endif()
 
 
 
+set(EXPORT_ODE_APP ON)
+# set(EXPORT_FLECS_APP OFF)
 
-
-
+if(${EXPORT_ODE_APP})
+    set(APP_ODE_NAME rl_flecs_ode)
+    add_executable(${APP_ODE_NAME}
+        examples/c/raylib_flecs_ode_gui03.c
+    )
+    # Link application with custom_cimgui
+    target_link_libraries(${APP_ODE_NAME} PRIVATE 
+        raylib                                          # raylib
+        flecs                                           # flecs
+        # cglm                                            # cglm
+        ODE                                             # ode must be cap from ode repo cmake config
+    )
+    # Include directories for the application
+    target_include_directories(${APP_ODE_NAME} PUBLIC
+        ${PROJECT_SOURCE_DIR}/include                       # include
+        ${lua_SOURCE_DIR}                                   # lua
+        ${raylib_SOURCE_DIR}/src                            # raylib include
+        ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+        ${enet_SOURCE_DIR}/include                          # enet
+        # ${stb_SOURCE_DIR}                                 # stb
+        ${raygui_SOURCE_DIR}/src                            # raygui
+        ${cglm_SOURCE_DIR}/include                          # clgm
+        # ${ode_SOURCE_DIR}/include                         # 
+        ${ode_BINARY_DIR}/include                           # 
+    )
+    # Windows-specific settings
+    if(WIN32)
+        target_link_libraries(${APP_ODE_NAME} PRIVATE 
+            ws2_32                                          # Winsock 2
+            gdi32                                           # Graphics Device Interface
+            user32                                          # Windows user interface
+            shell32                                         # Windows 
+            ws2_32                                          # network socket
+        )
+        target_link_options(${APP_ODE_NAME} PRIVATE
+            -static-libgcc                                  # GNU Compiler Collection
+            -static-libstdc++                               # Uncomment if C++ code is used
+            -static                                         # Avoid full static linking to prevent issues with system libraries
+        )
+    endif()
+endif()
 
 
 

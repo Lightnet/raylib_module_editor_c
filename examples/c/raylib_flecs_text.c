@@ -52,9 +52,6 @@ void RL_End_Draw_System(ecs_iter_t *it){
     EndDrawing();
 }
 
-
-
-
 int main(void)
 {
     // Initialization

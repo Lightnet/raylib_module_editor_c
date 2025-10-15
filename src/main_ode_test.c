@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include "ecs_components.h"
 #include "module_dev.h"
-#include "module_enet.h"
+// #include "module_enet.h"
+#include "module_ode.h"
 
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
@@ -26,15 +27,6 @@ int main(void) {
         .projection = CAMERA_PERSPECTIVE
     };
     ecs_set_ctx(world, &camera, NULL);
-
-    ecs_entity_t networkEntity = ecs_new(world);
-    ecs_set(world, networkEntity, NetworkConfig, {
-        .isServer = true,  // Or false for client
-        .port = 1234,
-        .maxPeers = 32,
-        .address = "localhost"  // For client
-    });
-    ecs_set(world, networkEntity, NetworkState, {0});  // Zeros: host=NULL, flags=false
 
     //Loop Logic and render
     while (!WindowShouldClose()) {
