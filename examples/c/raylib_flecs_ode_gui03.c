@@ -201,7 +201,6 @@ void on_reset_cube_system(ecs_iter_t *it) {
     if(current_cube != 0){
         //resetCubePosition(it->world, current_cube);
 
-
         // Use the query to iterate over all OdeBody entities
         ecs_iter_t qit = ecs_query_iter(it->world, cube_query);
 

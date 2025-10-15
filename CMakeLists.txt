@@ -329,9 +329,11 @@ if(${EXPORT_FLECS_APP})
     add_executable(${APP_FLECS_NAME}
         src/ecs_components.c
         src/module_dev.c
-        src/module_enet.c
+        # src/module_enet.c # not there no define...
+        src/module_ode.c
         # src/main.c
-        src/main_enet_test.c
+        # src/main_enet_test.c
+        src/main_ode_test.c
         # src/enet_test.c
         # src/raylib_physics_ode.c
         # src/raylib_flecs_ode_gui.c
@@ -381,7 +383,7 @@ endif()
 
 
 
-set(EXPORT_ENET_APP ON)
+set(EXPORT_ENET_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
 
 if(${EXPORT_ENET_APP})
@@ -468,12 +470,7 @@ if(${EXPORT_ENET_APP})
     endif()
 endif()
 
-
-
-
-
-
-set(EXPORT_ODE_APP ON)
+set(EXPORT_ODE_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
 
 if(${EXPORT_ODE_APP})
