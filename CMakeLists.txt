@@ -322,24 +322,35 @@ endif()
 
 set(EXPORT_FLECS_APP ON)
 # set(EXPORT_FLECS_APP OFF)
-
 if(${EXPORT_FLECS_APP})
-    message(STATUS "EXPORT FLECS APP")
-    set(APP_FLECS_NAME rlm)
-    add_executable(${APP_FLECS_NAME}
+
+    set(SRC_FLECS_MODULES
         src/ecs_components.c
         src/module_dev.c
-        # src/module_enet.c # not there no define...
+        src/module_enet.c # not there no define...
         src/module_ode.c
+        src/raygui_impl.c # define RAYGUI_IMPLEMENTATION
+    )
+
+    message(STATUS "EXPORT FLECS APP")
+    set(APP_FLECS_NAME1 rlm)
+    add_executable(${APP_FLECS_NAME1}
+        ${SRC_FLECS_MODULES}
         # src/main.c
-        # src/main_enet_test.c
-        src/main_ode_test.c
+        src/main_enet_test.c
+        # src/main_ode_test.c
+        # src/main_camera_test.c
         # src/enet_test.c
         # src/raylib_physics_ode.c
         # src/raylib_flecs_ode_gui.c
     )
+
+    target_compile_definitions(${APP_FLECS_NAME1} PRIVATE 
+        # RAYGUI_IMPLEMENTATION=1
+    )
+
     # Link application with custom_cimgui
-    target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+    target_link_libraries(${APP_FLECS_NAME1} PRIVATE 
         raylib                                          # raylib
         # lua                                           # lua
         flecs                                           # flecs
@@ -347,7 +358,7 @@ if(${EXPORT_FLECS_APP})
         ODE                                             # ode must be cap from ode repo cmake config
     )
     # Include directories for the application
-    target_include_directories(${APP_FLECS_NAME} PUBLIC
+    target_include_directories(${APP_FLECS_NAME1} PUBLIC
         ${PROJECT_SOURCE_DIR}/include                       # include
         ${lua_SOURCE_DIR}                                   # lua
         ${raylib_SOURCE_DIR}/src                            # raylib include
@@ -362,7 +373,7 @@ if(${EXPORT_FLECS_APP})
     # Windows-specific settings
     if(WIN32)
         # ws2_32 # network
-        target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+        target_link_libraries(${APP_FLECS_NAME1} PRIVATE 
             ws2_32                                          # Winsock 2
             gdi32                                           # Graphics Device Interface
             user32                                          # Windows user interface
@@ -370,18 +381,13 @@ if(${EXPORT_FLECS_APP})
             ws2_32                                          # network socket
         )
         # target_link_options(${APP_NAME} PRIVATE -static-libgcc)
-        target_link_options(${APP_FLECS_NAME} PRIVATE
+        target_link_options(${APP_FLECS_NAME1} PRIVATE
             -static-libgcc                                  # GNU Compiler Collection
             -static-libstdc++                               # Uncomment if C++ code is used
             -static                                         # Avoid full static linking to prevent issues with system libraries
         )
     endif()
 endif()
-
-
-
-
-
 
 set(EXPORT_ENET_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
@@ -520,55 +526,82 @@ endif()
 
 
 
+# set(EXPORT_EX_APP OFF) #ON OFF bool
+set(EXPORT_EX_APP ON) #ON OFF bool
 
-# # Define the list of example source files
-# set(examples
-#     # src/main01.c
-#     # src/main02.c
-#     src/raylib_physics_ode.c  # Include your physics test file
-# )
+if(${EXPORT_EX_APP})
 
-# # Loop over each example to create separate executables
-# foreach(example ${examples})
-#     # Extract the filename without extension to use as the executable name
-#     get_filename_component(example_name ${example} NAME_WE)
-#     set(APP_FLECS_NAME "rlm_${example_name}")  # e.g., rlm_main01, rlm_main02
+    # Define the list of example source files
+    set(examples
+        # src/main01.c
+        # src/main02.c
+        # examples/c/raylib_physics_ode.c  # Include your physics test file
+        # examples/c/rl_flecs_camera3d_cube_picking03.c  # 
+        examples/c/raylib_camera_move.c  # 
+    )
 
-#     # Create executable for the current example
-#     add_executable(${APP_FLECS_NAME} ${example})
+    set(SRC_MODULES
+        src/raygui_impl.c # define RAYGUI_IMPLEMENTATION
+        # src/ecs_components.c
+        # src/module_dev.c
+        # src/module_enet.c # not there no define...
+        # src/module_ode.c
+    )
 
-#     # Link application with libraries
-#     target_link_libraries(${APP_FLECS_NAME} PRIVATE 
-#         raylib          # raylib
-#         flecs           # flecs
-#         cglm            # cglm
-#         ode             # ode
-#     )
+    # Loop over each example to create separate executables
+    foreach(example ${examples})
+        # Extract the filename without extension to use as the executable name
+        get_filename_component(example_name ${example} NAME_WE)
+        set(APP_FLECS_NAME "ex_${example_name}")  # e.g., ex_main01, ex_main02
 
-#     # Include directories for the application
-#     target_include_directories(${APP_FLECS_NAME} PUBLIC
-#         ${PROJECT_SOURCE_DIR}/include                       # project include
-#         ${raylib_SOURCE_DIR}/src                            # raylib include
-#         ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
-#         ${raygui_SOURCE_DIR}/src                            # raygui
-#         ${cglm_SOURCE_DIR}/include                          # cglm
-#         ${ode_SOURCE_DIR}/include                           # ode
-#     )
+        # Create executable for the current example
+        add_executable(${APP_FLECS_NAME} 
+            ${SRC_MODULES}
+            ${example}
+        )
 
-#     # Windows-specific settings
-#     if(WIN32)
-#         target_link_libraries(${APP_FLECS_NAME} PRIVATE 
-#             ws2_32      # Winsock 2
-#             gdi32       # Graphics Device Interface
-#             user32      # Windows user interface
-#             shell32     # Windows Shell
-#         )
-#         target_link_options(${APP_FLECS_NAME} PRIVATE
-#             -static-libgcc      # GNU Compiler Collection
-#             -static-libstdc++   # Uncommented since you might use C++ with cglm/flecs
-#             -static             # Avoid full static linking
-#         )
-#     endif()
-# endforeach()
+        # target_compile_definitions(${APP_FLECS_NAME} PRIVATE 
+        #     RAYGUI_IMPLEMENTATION # src/raygui_impl.c
+        # )
 
-# message(STATUS "EXPORT FLECS APPS")
+        # Link application with libraries
+        target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+            raylib                                              # raylib
+            flecs                                               # flecs
+            cglm                                                # cglm
+            ODE                                                 # ode
+        )
+
+        # Include directories for the application
+        target_include_directories(${APP_FLECS_NAME} PUBLIC
+            ${PROJECT_SOURCE_DIR}/include                       # include
+            ${lua_SOURCE_DIR}                                   # lua
+            ${raylib_SOURCE_DIR}/src                            # raylib include
+            ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+            ${enet_SOURCE_DIR}/include                          # enet
+            # ${stb_SOURCE_DIR}                                 # stb
+            ${raygui_SOURCE_DIR}/src                            # raygui
+            ${cglm_SOURCE_DIR}/include                          # clgm
+            # ${ode_SOURCE_DIR}/include                         # 
+            ${ode_BINARY_DIR}/include                           # 
+        )
+
+        # Windows-specific settings
+        if(WIN32)
+            target_link_libraries(${APP_FLECS_NAME} PRIVATE 
+                ws2_32                                          # Winsock 2
+                gdi32                                           # Graphics Device Interface
+                user32                                          # Windows user interface
+                shell32                                         # Windows 
+                ws2_32                                          # network socket
+            )
+            target_link_options(${APP_FLECS_NAME} PRIVATE
+                -static-libgcc                                  # GNU Compiler Collection
+                -static-libstdc++                               # Uncommented since you might use C++ with cglm/flecs
+                -static                                         # Avoid full static linking
+            )
+        endif()
+    endforeach()
+
+    message(STATUS "EXPORT FLECS APPS")
+endif()

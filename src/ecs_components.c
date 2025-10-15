@@ -3,7 +3,7 @@
 // ecs_components.c
 #include "ecs_components.h"
 #include <stdio.h>
-#define RAYGUI_IMPLEMENTATION
+// #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 // Define global phase entities
@@ -215,7 +215,7 @@ void RLRender3DSystem(ecs_iter_t *it) {
       bool isChild = ecs_has_pair(it->world, entity, EcsChildOf, EcsWildcard);
       DrawModel(*(m[i].model), (Vector3){0, 0, 0}, 1.0f, isChild ? BLUE : RED);
   }
-  DrawGrid(10, 1.0f);
+//   DrawGrid(10, 1.0f);
 
   // does not work here.
   // Camera3D *camera = (Camera3D *)ecs_get_ctx(it->world);

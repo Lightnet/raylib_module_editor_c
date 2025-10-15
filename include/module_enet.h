@@ -66,6 +66,11 @@ typedef struct {
 } enet_packet_t;
 extern ECS_COMPONENT_DECLARE(enet_packet_t);
 
+typedef struct {
+    ENetPeer *peer;             // Client peer (null for server)
+} enet_client_t;
+extern ECS_COMPONENT_DECLARE(enet_client_t);
+
 // New: NetworkConfig component for server/client setup
 typedef struct {
     bool isNetwork;             // True to enable network, false to disable
@@ -89,6 +94,9 @@ extern ECS_COMPONENT_DECLARE(NetworkState);
 
 // Declare event entity as extern for global access
 extern ecs_entity_t event_receive_packed;
+extern ecs_entity_t event_connect_peer;
+extern ecs_entity_t event_disconnect_peer;
+extern ecs_entity_t event_disconnect_timeout;
 
 void module_init_enet(ecs_world_t *world);
 

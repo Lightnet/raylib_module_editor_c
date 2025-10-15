@@ -2,7 +2,7 @@
 #include <math.h>
 #include "raylib.h"
 #include "raymath.h"
-#define RAYGUI_IMPLEMENTATION
+// #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 #include "ode/ode.h"
 

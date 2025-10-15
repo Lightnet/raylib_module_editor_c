@@ -10,7 +10,7 @@
 #include <flecs.h>
 #include "raylib.h"
 #include <math.h>
-#define RAYGUI_IMPLEMENTATION
+// #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 // component

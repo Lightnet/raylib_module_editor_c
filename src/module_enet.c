@@ -17,12 +17,16 @@
 ECS_COMPONENT_DECLARE(enet_packet_t);
 ECS_COMPONENT_DECLARE(NetworkConfig);
 ECS_COMPONENT_DECLARE(NetworkState);
+ECS_COMPONENT_DECLARE(enet_client_t);
 
 // Declare event entity (defined in setup_components_enet)
 // ecs_entity_t event_receive_packed = 0;
 ecs_entity_t event_receive_packed;
-ENetHost *g_host = NULL;  // Global for simplicity (or store in singleton)
+ecs_entity_t event_connect_peer;
+ecs_entity_t event_disconnect_peer;
+ecs_entity_t event_disconnect_timeout;
 
+ENetHost *g_host = NULL;  // Global for simplicity (or store in singleton)
 
 // Render HUD system
 void render2d_hud_enet_system(ecs_iter_t *it) {
@@ -163,21 +167,84 @@ void network_service_system(ecs_iter_t *it) {
         printf("Network event: %d\n", event.type);
         switch (event.type) {
             case ENET_EVENT_TYPE_CONNECT:
-                printf("Connected! Peer ID: %u\n", event.peer->incomingPeerID);
+                // printf("Connected! Peer ID: %u\n", event.peer->incomingPeerID);
+                printf("Connected! Peer ID: %u\n", event.peer->connectID);
                 state->isConnected = true;
                 if (!state->isServer) {
                     state->clientConnected = true;
                 }
+
+                if(state->isServer == true){
+                    state->peer = event.peer;
+                }
+
                 ecs_singleton_modified(it->world, NetworkState);
+
+                // add either server or client peer when connected
+                ecs_entity_t new_peer = ecs_new(it->world);
+                ecs_set(it->world, new_peer, enet_client_t, {
+                    .peer = event.peer
+                });
+
+
                 break;
             case ENET_EVENT_TYPE_DISCONNECT:
+                printf("Disconnected! Peer ID: %d\n", event.peer->connectID);
+
+                ecs_query_t *q = ecs_query(it->world, {
+                    .terms = {
+                        { .id = ecs_id(enet_client_t) }
+                    }
+                });
+
+                ecs_iter_t qit = ecs_query_iter(it->world, q);
+                while (ecs_query_next(&qit)) {
+                    enet_client_t *peer = ecs_field(&qit, enet_client_t, 0);
+                    for (int i = 0; i < qit.count; i++) {
+                        // Do the thing
+                        if (peer[i].peer->connectID == event.peer->connectID){
+                            printf("found peer! remove!\n");
+                            ecs_delete(it->world, qit.entities[i]);
+                            break;
+                        }
+                    }
+                }
+                //clean up query
+                ecs_query_fini(q);
+
+                break;
             case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT:
-                printf("Disconnected\n");
+                printf("Disconnected timout! connectID: %d\n", event.peer->connectID);
+                printf("Disconnected timout! incomingPeerID: %d\n", event.peer->incomingPeerID);
+                printf("Disconnected timout! incomingSessionID: %d\n", event.peer->incomingSessionID);
                 state->isConnected = false;
                 if (!state->isServer) {
                     state->clientConnected = false;
                 }
                 ecs_singleton_modified(it->world, NetworkState);
+
+                ecs_query_t *qd = ecs_query(it->world, {
+                    .terms = {
+                        { .id = ecs_id(enet_client_t) }
+                    }
+                });
+
+                ecs_iter_t qdit = ecs_query_iter(it->world, qd);
+                while (ecs_query_next(&qdit)) {
+                    enet_client_t *peer = ecs_field(&qdit, enet_client_t, 0);
+                    for (int i = 0; i < qdit.count; i++) {
+                        // Do the thing
+                        if (peer[i].peer->connectID == event.peer->connectID){
+                            printf("found peer! remove!\n");
+                            printf("entity id: %d\n", qdit.entities[i]);
+                            ecs_delete(it->world, qdit.entities[i]);
+                            break;
+                        }
+                    }
+                }
+                //clean up query
+                ecs_query_fini(qd);
+
                 break;
             case ENET_EVENT_TYPE_RECEIVE:
                 printf("Received packet from peer %u, channel %u, size %zu\n",
@@ -199,23 +266,24 @@ void network_service_system(ecs_iter_t *it) {
         }
     }
 
-    // Send periodic packets (like standalone code)
-    if (state->isServer && state->serverStarted) {
-        for (size_t i = 0; i < state->host->peerCount; i++) {
-            ENetPeer *peer = &state->host->peers[i];
-            if (peer->state == ENET_PEER_STATE_CONNECTED) {
-                ENetPacket *packet = enet_packet_create("HELLO WORLD", strlen("HELLO WORLD") + 1, ENET_PACKET_FLAG_RELIABLE);
-                enet_peer_send(peer, 0, packet);
-            }
-        }
-        enet_host_flush(state->host);
-    } else if (state->isConnected && !state->isServer && state->peer) {
-        if (state->peer->state == ENET_PEER_STATE_CONNECTED) {
-            ENetPacket *packet = enet_packet_create("HELLO WORLD", strlen("HELLO WORLD") + 1, ENET_PACKET_FLAG_RELIABLE);
-            enet_peer_send(state->peer, 0, packet);
-            enet_host_flush(state->host);
-        }
-    }
+    // // test
+    // // Send periodic packets (like standalone code)
+    // if (state->isServer && state->serverStarted) {
+    //     for (size_t i = 0; i < state->host->peerCount; i++) {
+    //         ENetPeer *peer = &state->host->peers[i];
+    //         if (peer->state == ENET_PEER_STATE_CONNECTED) {
+    //             ENetPacket *packet = enet_packet_create("HELLO WORLD", strlen("HELLO WORLD") + 1, ENET_PACKET_FLAG_RELIABLE);
+    //             enet_peer_send(peer, 0, packet);
+    //         }
+    //     }
+    //     enet_host_flush(state->host);
+    // } else if (state->isConnected && !state->isServer && state->peer) {
+    //     if (state->peer->state == ENET_PEER_STATE_CONNECTED) {
+    //         ENetPacket *packet = enet_packet_create("HELLO WORLD", strlen("HELLO WORLD") + 1, ENET_PACKET_FLAG_RELIABLE);
+    //         enet_peer_send(state->peer, 0, packet);
+    //         enet_host_flush(state->host);
+    //     }
+    // }
 }
 
 
@@ -255,11 +323,20 @@ void network_input_system(ecs_iter_t *it) {
         });
         printf("Triggering client connect...\n");
     }
-    if (IsKeyPressed(KEY_T) && state->clientConnected && state->peer) {
-        ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
-        enet_peer_send(state->peer, 0, packet);
-        enet_host_flush(state->host);
-        printf("Sent test packet\n");
+    if (IsKeyPressed(KEY_T)) {
+        if(state->isServer == false && state->clientConnected && state->peer){
+            ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_send(state->peer, 0, packet);
+            enet_host_flush(state->host);
+            printf("Sent test packet\n");
+        }
+
+        if(config->isNetwork == true && state->isServer == true && state->peer){
+            ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
+            enet_peer_send(state->peer, 0, packet);
+            enet_host_flush(state->host);
+            printf("Sent test packet\n");
+        }
     }
     if (IsKeyPressed(KEY_Y) && state->clientConnected && state->peer) {
         printf("Client state: %d\n", state->peer->state);
@@ -340,9 +417,13 @@ void setup_components_enet(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, enet_packet_t); 
     ECS_COMPONENT_DEFINE(world, NetworkConfig);
     ECS_COMPONENT_DEFINE(world, NetworkState);
+    ECS_COMPONENT_DEFINE(world, enet_client_t);
 
-    // Define the event entity
+    // Define the event entity network type
     event_receive_packed = ecs_entity(world, { .name = "receive_packed" });
+    event_connect_peer = ecs_entity(world, { .name = "event_connect_peer" });
+    event_disconnect_peer = ecs_entity(world, { .name = "event_disconnect_peer" });
+    event_disconnect_timeout = ecs_entity(world, { .name = "event_disconnect_timeout" });
 }
 
 
