@@ -7,27 +7,14 @@
 // #include "module_enet.h"
 #include "module_ode.h"
 
-// In your initialization code
+ecs_entity_t reset_t;
+ecs_entity_t current_cube;
+static ecs_query_t *cube_query = NULL;
+
 typedef struct {
-    Model cube_model;
-} render_assets_t;
-
-render_assets_t render_assets = {0};
-
-void init_render_assets(float cube_size) {
-    // Generate cube mesh and load as model
-    render_assets.cube_model = LoadModelFromMesh(GenMeshCube(cube_size, cube_size, cube_size));
-    
-    // Optional: Set material properties
-    // SetMaterialTexture(&render_assets.cube_model.materials[0], MAP_DIFFUSE, some_texture);
-    
-    printf("Cube model loaded with %d meshes\n", render_assets.cube_model.meshCount);
-}
-
-// Cleanup
-void cleanup_render_assets() {
-    UnloadModel(render_assets.cube_model);
-}
+    bool reset_requested;
+} ResetRequest;
+ECS_COMPONENT_DECLARE(ResetRequest);
 
 // Convert Transform3D to raylib Matrix for rendering
 static Matrix transform3d_to_raylib_matrix(const Transform3D *transform) {
@@ -47,40 +34,6 @@ static Matrix transform3d_to_raylib_matrix(const Transform3D *transform) {
     return result;
 }
 
-// Rendering system that draws entities with Transform3D and cube model
-void render_transform_3d_system(ecs_iter_t *it) {
-    Transform3D *transform = ecs_field(it, Transform3D, 0);
-    
-    // Get delta time for smooth rendering
-    // float delta_time = (float)ecs_get_target_fps(it->world) > 0 ? 
-    //                    1.0f / ecs_get_target_fps(it->world) : 1.0f / 60.0f;
-
-    Vector3 cubePosition = { 0.0f, 0.0f, 0.0f };
-    DrawCube(cubePosition, 1.0f, 1.0f, 1.0f, RED);
-    
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t e = it->entities[i];
-        
-        // Skip if not dirty (optimization)
-        if (!transform[i].isDirty) {
-            continue;
-        }
-        
-        // Convert transform to raylib matrix
-        Matrix model_matrix = transform3d_to_raylib_matrix(&transform[i]);
-        
-        // Apply the transform to the model
-        render_assets.cube_model.transform = model_matrix;
-        
-        // Draw the model at origin (transform is already applied)
-        DrawModel(render_assets.cube_model, (Vector3){0, 0, 0}, 1.0f, RED);
-        DrawModelWires(render_assets.cube_model, (Vector3){0, 0, 0}, 1.0f, BLACK);
-        
-        // Reset dirty flag after rendering
-        transform[i].isDirty = false;
-    }
-}
-
 // Function to reset cube position randomly
 void reset_cube_position(ecs_world_t *ecs_world, ecs_entity_t entity) {
     ode_body_t *body = ecs_get_mut(ecs_world, entity, ode_body_t);
@@ -93,17 +46,103 @@ void reset_cube_position(ecs_world_t *ecs_world, ecs_entity_t entity) {
     //ecs_modified(ecs_world, entity, ode_body_t);
 }
 
+
+// Reset system - runs before physics
+void on_reset_cube_system(ecs_iter_t *it) {
+    printf("reset! %d\n", current_cube);
+    // if(current_cube != 0){
+        //resetCubePosition(it->world, current_cube);
+
+
+        cube_query = ecs_query(it->world, {
+        .terms = {{ ecs_id(ode_body_t) }}
+        });
+
+        // Use the query to iterate over all ode_body_t entities
+        ecs_iter_t qit = ecs_query_iter(it->world, cube_query);
+        printf("check body: %d\n", qit.count);
+
+        while (ecs_query_next(&qit)) {
+            ode_body_t *bodies = ecs_field(&qit, ode_body_t, 0);
+            
+            for (int i = 0; i < qit.count; i++) {
+                ecs_entity_t entity = qit.entities[i];
+                dBodyID body = bodies[i].id;
+                printf("found body\n");
+                
+                if (body) {  // Safety check
+                    // Reset position and velocities
+                    float x = (float)GetRandomValue(-5, 5);
+                    float z = (float)GetRandomValue(-5, 5);
+                    float y = (float)GetRandomValue(5, 15);
+                    
+                    dBodySetPosition(body, x, y, z);
+                    dBodySetLinearVel(body, 0, 0, 0);
+                    dBodySetAngularVel(body, 0, 0, 0);
+                    
+                    printf("Reset entity %lu to (%.2f, %.2f, %.2f)\n", 
+                        (unsigned long)entity, x, y, z);
+                    
+                    // Mark component as modified for ECS
+                    // ecs_modified(it->world, entity, ode_body_t);
+                }
+            }
+        }
+
+        ecs_query_fini(cube_query);
+    // }
+}
+
+void test_input_system(ecs_iter_t *it){
+    // printf("hello wolrd!\n");
+    if (IsKeyPressed(KEY_R)) {
+        printf("hello wolrd!\n");
+        // Emit entity event.
+        ecs_emit(it->world, &(ecs_event_desc_t) {
+            .event = ecs_id(ResetRequest),
+            .entity = reset_t,
+            .param = &(ResetRequest){.reset_requested=true}
+        });
+    }
+}
+
+
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
 
     ecs_world_t *world = ecs_init();
 
+    ECS_COMPONENT_DEFINE(world, ResetRequest);
+
+    reset_t = ecs_entity(world, { .name = "reset" });
+    cube_query = ecs_query(world, {
+        .terms = {{ ecs_id(ode_body_t) }}
+    });
+
     // Initialize components and phases
     module_init_raylib(world);
     // module_init_dev(world);
     // module_init_enet(world);
     module_init_ode(world);
+
+
+    // Create an entity observer
+    ecs_observer(world, {
+        // Not interested in any specific component
+        .query.terms = {{ EcsAny, .src.id = reset_t }},
+        .events = { ecs_id(ResetRequest) },
+        .callback = on_reset_cube_system
+    });
+
+    // In your module init
+    // ECS_SYSTEM(world, render_transform_3d_system, RLEndMode3DPhase, Transform3D);
+
+    // Input
+    ecs_system_init(world, &(ecs_system_desc_t){
+      .entity = ecs_entity(world, { .name = "test_input_system", .add = ecs_ids(ecs_dependson(EcsOnUpdate)) }),
+      .callback = test_input_system
+    });
 
     // setup Camera 3D
     Camera3D camera = {
@@ -123,12 +162,13 @@ int main(void) {
     dGeomID ground = dCreatePlane(ode_context->space, 0, 1, 0, 0); // Normal (0,1,0), distance 0
     ecs_set(world, ground_entity, ode_geom_t, { .id = ground });
 
-    init_render_assets(1.0f);
+    // init_render_assets(1.0f);
 
     // Create cube entity
     // Define cube size
     const float cube_size = 1.0f;
     ecs_entity_t cube = ecs_entity(world, {.name = "Cube"});
+    
     dBodyID cube_body = dBodyCreate(ode_context->world);
     dMass mass;
     dMassSetBox(&mass, 1.0, cube_size, cube_size, cube_size);
@@ -149,18 +189,14 @@ int main(void) {
     // create Model
     Model cuber = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
     ecs_set(world, cube, ModelComponent, {&cuber});
-
-
+    ecs_set(world, cube, ResetRequest,{
+        .reset_requested=false
+    }); // Add reset component
+    current_cube = cube;
     reset_cube_position(world, cube);
 
 
 
-    // In your module init
-    ECS_SYSTEM(world, render_transform_3d_system, RLEndMode3DPhase, Transform3D);
-
-
-
-    
 
     // Create Entity
     ecs_entity_t node1 = ecs_entity(world, {

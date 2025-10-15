@@ -12,6 +12,7 @@ ECS_COMPONENT_DECLARE(ode_body_t);
 ECS_COMPONENT_DECLARE(ode_geom_t);
 ECS_COMPONENT_DECLARE(ode_context_t);
 
+
 // ECS_COMPONENT_DECLARE(Transform3D);
 
 // Helper function to convert ODE 4x4 matrix to raylib Matrix
@@ -63,7 +64,6 @@ static Quaternion matrix_to_quaternion(const Matrix *mat) {
     }
 }
 
-
 // Callback for collision detection
 static void nearCallback(void *data, dGeomID o1, dGeomID o2) {
     ode_context_t *ctx = (ode_context_t*)data;
@@ -109,14 +109,14 @@ void sync_transform_3d_system(ecs_iter_t *it){
     ode_body_t *body = ecs_field(it, ode_body_t, 0);
     Transform3D *transform = ecs_field(it, Transform3D, 1);
     
-    printf("sync\n");
+    // printf("sync\n");
 
     for (int i = 0; i < it->count; i++) {
         ecs_entity_t e = it->entities[i];
         const dReal *pos = dBodyGetPosition(body[i].id);
         const dReal *rot_matrix = dBodyGetRotation(body[i].id);
         
-        printf("y: %f\n", pos[1]);
+        // printf("y: %f\n", pos[1]);
         
         // Update position
         transform[i].position = (Vector3){
@@ -156,7 +156,7 @@ void sync_transform_3d_system(ecs_iter_t *it){
         transform[i].isDirty = true;
         
         // Notify ECS that transform changed
-        ecs_modified(it->world, e, Transform3D);
+        // ecs_modified(it->world, e, Transform3D);
     }
 }
 

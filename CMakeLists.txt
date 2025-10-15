@@ -330,6 +330,7 @@ if(${EXPORT_FLECS_APP})
         src/module_enet.c # not there no define...
         src/module_ode.c
         src/raygui_impl.c # define RAYGUI_IMPLEMENTATION
+        src/enet_impl.c # define RAYGUI_IMPLEMENTATION
     )
 
     message(STATUS "EXPORT FLECS APP")
@@ -337,8 +338,8 @@ if(${EXPORT_FLECS_APP})
     add_executable(${APP_FLECS_NAME1}
         ${SRC_FLECS_MODULES}
         # src/main.c
-        src/main_enet_test.c
-        # src/main_ode_test.c
+        # src/main_enet_test.c
+        src/main_ode_test.c
         # src/main_camera_test.c
         # src/enet_test.c
         # src/raylib_physics_ode.c

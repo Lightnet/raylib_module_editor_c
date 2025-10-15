@@ -321,11 +321,11 @@ void render2d_hud_system(ecs_iter_t *it){
   Transform3D *t = ecs_field(it, Transform3D, 0);
   float dt = GetFrameTime();
 
-  for (int i = 0; i < it->count; i++) {
-    DrawText(TextFormat("Entity %s Pos: %.2f, %.2f, %.2f", 
-      ecs_get_name(it->world, it->entities[i]) ? ecs_get_name(it->world, it->entities[i]) : "unnamed", 
-      t[i].position.x, t[i].position.y, t[i].position.z), 10, 130 + i * 20, 20, DARKGRAY);
-  }
+  // for (int i = 0; i < it->count; i++) {
+  //   DrawText(TextFormat("Entity %s Pos: %.2f, %.2f, %.2f", 
+  //     ecs_get_name(it->world, it->entities[i]) ? ecs_get_name(it->world, it->entities[i]) : "unnamed", 
+  //     t[i].position.x, t[i].position.y, t[i].position.z), 10, 130 + i * 20, 20, DARKGRAY);
+  // }
   DrawText(TextFormat("Entity Count: %d", it->count), 10, 10, 20, DARKGRAY);
   DrawText(pi_ctx->isMovementMode ? "Mode: Movement (WASD)" : "Mode: Rotation (QWE/ASD)", 10, 30, 20, DARKGRAY);
   DrawText("Tab: Toggle Mode | R: Reset", 10, 50, 20, DARKGRAY);
