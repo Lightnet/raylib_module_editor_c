@@ -1,20 +1,20 @@
+// module_ode.c
+// ODE 0.16.6
 // physics 3D
-// https://github.com/thomasmarsh/ODE
+// https://github.com/thomasmarsh/ODE 0.15.
+// https://bitbucket.org/odedevs/ode 0.16.6
 
 #include "ecs_components.h" // phase
 #include "module_ode.h"
 #include "raygui.h"
 #include "raymath.h"
 
-
 // Declare and define component in the source file
 ECS_COMPONENT_DECLARE(ode_body_t);
 ECS_COMPONENT_DECLARE(ode_geom_t);
 ECS_COMPONENT_DECLARE(ode_context_t);
 
-
 // ECS_COMPONENT_DECLARE(Transform3D);
-
 // Helper function to convert ODE 4x4 matrix to raylib Matrix
 /*
 static Matrix ode_matrix_to_raylib(const dReal *ode_matrix) {
@@ -171,6 +171,8 @@ void sync_transform_3d_system(ecs_iter_t *it){
         // transform[i].rotation.y = (float)ode_quat[1];
         // transform[i].rotation.z = (float)ode_quat[2];
         // transform[i].rotation.w = (float)ode_quat[3];
+
+        if (!ode_quat_ptr) return;
 
         transform[i].rotation.x = (float)ode_quat_ptr[0];
         transform[i].rotation.y = (float)ode_quat_ptr[1];

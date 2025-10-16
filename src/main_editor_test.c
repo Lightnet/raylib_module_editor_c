@@ -15,6 +15,11 @@ void on_remove_entity(ecs_iter_t *it){
 
 }
 
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
+}
+
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -24,6 +29,8 @@ int main(void) {
     // Initialize components and phases
     module_init_raylib(world);
     module_init_dev(world);
+
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
     // Create observer that is invoked whenever Position is set
     ecs_observer(world, {
@@ -40,7 +47,9 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
 
     // setup Input
     ecs_singleton_set(world, PlayerInput_T, {

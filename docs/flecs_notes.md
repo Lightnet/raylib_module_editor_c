@@ -362,3 +362,31 @@ ecs_set(world, node2, Transform3D, {
     .isDirty = true
 });
 ```
+
+- https://www.flecs.dev/flecs/md_docs_2Quickstart.html
+
+```c
+// Module header (e.g. MyModule.h)
+typedef struct {
+    float x;
+    float y;
+} Position;
+ 
+extern ECS_COMPONENT_DECLARE(Position);
+ 
+// The import function name has to follow the convention: <ModuleName>Import
+void MyModuleImport(ecs_world_t *world);
+```
+
+```c
+// Module source (e.g. MyModule.c)
+ECS_COMPONENT_DECLARE(Position);
+ 
+void MyModuleImport(ecs_world_t *world) {
+    ECS_MODULE(world, MyModule);
+    ECS_COMPONENT_DEFINE(world, Position);
+}
+ 
+// Import code
+ECS_IMPORT(world, MyModule);
+```

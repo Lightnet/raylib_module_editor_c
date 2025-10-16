@@ -1,3 +1,6 @@
+- example - billboard rendering
+- 
+
 
 
 
@@ -36,7 +39,7 @@ int main(void)
 }
 ```
 
-```
+```c
 while !WindowShouldClose {
     BeginDrawing(camera)
         ClearBackground

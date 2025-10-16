@@ -63,13 +63,14 @@ int main(void) {
     });
 
 
-    ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, ecs_id(main_context_t));
+    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, ecs_id(main_context_t));
+    ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t);
 
     // setup Input
-    ecs_singleton_set(world, PlayerInput_T, {
-      .isMovementMode=true,
-      .tabPressed=false
-    });
+    // ecs_singleton_set(world, PlayerInput_T, {
+    //   .isMovementMode=true,
+    //   .tabPressed=false
+    // });
 
     // create Model
     Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));

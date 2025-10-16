@@ -59,8 +59,6 @@ int main(void) {
     ecs_singleton_set(world, main_context_t, {
         .camera = camera
     });
-    // ecs_set_ctx(world, &camera, NULL);
-
 
     ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase);
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);

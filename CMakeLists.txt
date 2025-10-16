@@ -330,20 +330,20 @@ if(${EXPORT_FLECS_APP})
         src/module_enet.c # not there no define...
         src/module_ode.c
         src/raygui_impl.c # define RAYGUI_IMPLEMENTATION
-        src/enet_impl.c # define RAYGUI_IMPLEMENTATION
+        src/enet_impl.c # define ENET_IMPLEMENTATION
     )
 
     message(STATUS "EXPORT FLECS APP")
     set(APP_FLECS_NAME1 rlm)
     add_executable(${APP_FLECS_NAME1}
         ${SRC_FLECS_MODULES}
-        # src/main.c
-        src/main_enet_test.c
+        # src/main_camera_test01.c
+        # src/main_camera_test02.c
+        src/main_editor_test.c
+        # src/main_enet_test.c
         # src/main_ode_test.c
-        # src/main_camera_test.c
-        # src/enet_test.c
-        # src/raylib_physics_ode.c
-        # src/raylib_flecs_ode_gui.c
+        # src/main_transform_3d_hierarchy_test.c
+        # src/main.c
     )
 
     target_compile_definitions(${APP_FLECS_NAME1} PRIVATE 
@@ -392,7 +392,6 @@ endif()
 
 set(EXPORT_ENET_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
-
 if(${EXPORT_ENET_APP})
     message(STATUS "EXPORT ENET APP")
     set(APP_ENET_CLIENT_NAME enet_client)
@@ -479,7 +478,6 @@ endif()
 
 set(EXPORT_ODE_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
-
 if(${EXPORT_ODE_APP})
     set(APP_ODE_NAME rl_flecs_ode)
     add_executable(${APP_ODE_NAME}
@@ -523,13 +521,8 @@ if(${EXPORT_ODE_APP})
 endif()
 
 
-
-
-
-
-# set(EXPORT_EX_APP OFF) #ON OFF bool
-set(EXPORT_EX_APP ON) #ON OFF bool
-
+set(EXPORT_EX_APP OFF) #ON OFF bool
+# set(EXPORT_EX_APP ON) #ON OFF bool
 if(${EXPORT_EX_APP})
 
     # Define the list of example source files

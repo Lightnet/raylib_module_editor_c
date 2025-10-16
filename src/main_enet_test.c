@@ -9,6 +9,27 @@
 #include "module_dev.h"
 #include "module_enet.h"
 
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
+}
+// check number clients for server and client.
+void render_2d_network(ecs_iter_t *it){
+    ecs_query_t *q = ecs_query(it->world, {
+        .terms = {
+            { .id = ecs_id(enet_client_t) }
+        }
+    });
+    int count = 0;
+    ecs_iter_t qit = ecs_query_iter(it->world, q);
+    while (ecs_query_next(&qit)) {
+        count += qit.count;
+    }
+    //clean up query
+    ecs_query_fini(q);
+    DrawText( TextFormat("Client(s): %d", count), 2, 25*3, 20, DARKGRAY);
+}
+
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -20,6 +41,12 @@ int main(void) {
     module_init_dev(world);
     module_init_enet(world);
 
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
+
+
+    ECS_SYSTEM(world, render_2d_network, RLRender2D1Phase);
+
+
     // setup Camera 3D
     Camera3D camera = {
         .position = (Vector3){10.0f, 10.0f, 10.0f},
@@ -28,7 +55,9 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
 
     // Initialize singletons with default values
     ecs_singleton_set(world, NetworkConfig, {
@@ -61,8 +90,6 @@ int main(void) {
         enet_host_destroy(state->host);
         enet_deinitialize();
     }
-
-
 
     ecs_fini(world);
     CloseWindow();

@@ -40,7 +40,9 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
 
     // setup Input
     ecs_singleton_set(world, PlayerInput_T, {

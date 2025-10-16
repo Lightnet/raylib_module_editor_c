@@ -1,10 +1,10 @@
 // module_enet.c
+// 
 /*
 - system set up for server or client
 - system loop with condtions
 - system pass event for flecs
-- system filter 
-
+- system filter pack data from network incoming
 */
 #include <stdio.h>
 
@@ -206,8 +206,7 @@ void network_service_system(ecs_iter_t *it) {
                 ecs_set(it->world, new_peer, enet_client_t, {
                     .peer = event.peer
                 });
-
-
+                
                 break;
             case ENET_EVENT_TYPE_DISCONNECT:
                 printf("Disconnected! Peer ID: %d\n", event.peer->connectID);
