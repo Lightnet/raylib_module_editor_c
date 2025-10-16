@@ -21,13 +21,8 @@ void camera_input_system(ecs_iter_t *it){
 
     Camera3D *camera = (Camera3D *)ecs_get_ctx(it->world);
     if (!camera) return;
-
-
     // Camera3D *camera = &sceneContext->camera;
-
-    // if (IsCursorHidden()) UpdateCamera(&camera, CAMERA_FIRST_PERSON);
     if (IsCursorHidden()) UpdateCamera(camera, CAMERA_FIRST_PERSON);
-
     // Toggle camera controls
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
     {
@@ -61,93 +56,32 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
+    // ecs_set_ctx(world, &camera, NULL);
 
 
     ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase);
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
     // setup Input
-    ecs_singleton_set(world, PlayerInput_T, {
-      .isMovementMode=true,
-      .tabPressed=false
-    });
+    // test
+    // ecs_singleton_set(world, PlayerInput_T, {
+    //   .isMovementMode=true,
+    //   .tabPressed=false
+    // });
 
     // create Model
-    Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    // Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
 
-    // Create Entity
-    // ecs_entity_t node1 = ecs_entity(world, {
-    //   .name = "NodeParent"
-    // });
-
-    // ecs_set(world, node1, Transform3D, {
-    //     .position = (Vector3){0.0f, 0.0f, 0.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){1.0f, 1.0f, 1.0f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node1, ModelComponent, {&cube});
-    
-    // // Create Entity to parent to NodeParent
-    // ecs_entity_t node2 = ecs_entity(world, {
-    //     .name = "NodeChild",
-    //     .parent = node1
-    // });
-    // ecs_set(world, node2, Transform3D, {
-    //     .position = (Vector3){2.0f, 0.0f, 0.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node2, ModelComponent, {&cube});
-    
-    // // Create Entity to parent to NodeParent
-    // ecs_entity_t node3 = ecs_entity(world, {
-    //     .name = "Node3",
-    //     .parent = node1
-    // });
-    // ecs_set(world, node3, Transform3D, {
-    //     .position = (Vector3){2.0f, 0.0f, 2.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node3, ModelComponent, {&cube});
-
-    // // Create Entity to parent to NodeChild
-    // ecs_entity_t node4 = ecs_entity(world, {
-    //     .name = "NodeGrandchild",
-    //     .parent = node2
-    // });
-    // ecs_set(world, node4, Transform3D, {
-    //     .position = (Vector3){1.0f, 0.0f, 1.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node4, ModelComponent, {&cube});
-
-    // ecs_entity_t gui = ecs_new(world);
-    // ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
-    // ecs_set(world, gui, TransformGUI, {
-    //     .id = node1  // Reference the id entity
-    // });
 
     //Loop Logic and render
     while (!WindowShouldClose()) {
       ecs_progress(world, 0);
     }
 
-    UnloadModel(cube);
+    // UnloadModel(cube);
     ecs_fini(world);
     CloseWindow();
     return 0;

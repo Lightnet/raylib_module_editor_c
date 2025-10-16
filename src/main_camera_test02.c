@@ -17,14 +17,13 @@ typedef struct {
 
 void camera_input_system(ecs_iter_t *it){
 
-    Camera3D *camera = (Camera3D *)ecs_get_ctx(it->world);
-    if (!camera) return;
+    main_context_t *main_context = ecs_field(it, main_context_t, 0);
 
 
     // Camera3D *camera = &sceneContext->camera;
 
     // if (IsCursorHidden()) UpdateCamera(&camera, CAMERA_FIRST_PERSON);
-    if (IsCursorHidden()) UpdateCamera(camera, CAMERA_FIRST_PERSON);
+    if (IsCursorHidden()) UpdateCamera(&main_context->camera, CAMERA_FIRST_PERSON);
 
     // Toggle camera controls
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
@@ -59,10 +58,12 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
 
 
-    ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase);
+    ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, ecs_id(main_context_t));
 
     // setup Input
     ecs_singleton_set(world, PlayerInput_T, {

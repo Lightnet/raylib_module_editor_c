@@ -45,8 +45,6 @@ void reset_cube_position(ecs_world_t *ecs_world, ecs_entity_t entity) {
     dBodySetAngularVel(body->id, 0, 0, 0);
     //ecs_modified(ecs_world, entity, ode_body_t);
 }
-
-
 // Reset system - runs before physics
 void on_reset_cube_system(ecs_iter_t *it) {
     printf("reset! %d\n", current_cube);
@@ -91,7 +89,7 @@ void on_reset_cube_system(ecs_iter_t *it) {
         ecs_query_fini(cube_query);
     // }
 }
-
+// user input
 void test_input_system(ecs_iter_t *it){
     // printf("hello wolrd!\n");
     if (IsKeyPressed(KEY_R)) {
@@ -104,7 +102,10 @@ void test_input_system(ecs_iter_t *it){
         });
     }
 }
-
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
+}
 
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
@@ -125,6 +126,7 @@ int main(void) {
     // module_init_enet(world);
     module_init_ode(world);
 
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
     // Create an entity observer
     ecs_observer(world, {
@@ -151,7 +153,9 @@ int main(void) {
         .fovy = 45.0f,
         .projection = CAMERA_PERSPECTIVE
     };
-    ecs_set_ctx(world, &camera, NULL);
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
 
     const ode_context_t *ode_context = ecs_singleton_get_mut(world, ode_context_t);
 

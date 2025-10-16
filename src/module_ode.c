@@ -16,6 +16,7 @@ ECS_COMPONENT_DECLARE(ode_context_t);
 // ECS_COMPONENT_DECLARE(Transform3D);
 
 // Helper function to convert ODE 4x4 matrix to raylib Matrix
+/*
 static Matrix ode_matrix_to_raylib(const dReal *ode_matrix) {
     return (Matrix){
         .m0 = (float)ode_matrix[0],  .m4 = (float)ode_matrix[4],  .m8 = (float)ode_matrix[8],   .m12 = (float)ode_matrix[3],
@@ -24,8 +25,44 @@ static Matrix ode_matrix_to_raylib(const dReal *ode_matrix) {
         .m3 = (float)ode_matrix[12], .m7 = (float)ode_matrix[13], .m11 = (float)ode_matrix[14], .m15 = (float)ode_matrix[15]
     };
 }
-
+*/
+// Correct helper function to convert ODE 3x3 row-major rotation to raylib 4x4 column-major
+/*
+static Matrix ode_rotation_to_raylib(const dReal *ode_rotation) {
+    // ODE rotation matrix is row-major 3x3:
+    // [ A B C ]    [ 0 1 2 ]
+    // [ D E F ] -> [ 3 4 5 ]
+    // [ G H I ]    [ 6 7 8 ]
+    
+    return (Matrix){
+        // Column 0: A D G 0 (first column of rotation matrix)
+        .m0  = (float)ode_rotation[0],  // A
+        .m1  = (float)ode_rotation[3],  // D  
+        .m2  = (float)ode_rotation[6],  // G
+        .m3  = 0.0f,
+        
+        // Column 1: B E H 0
+        .m4  = (float)ode_rotation[1],  // B
+        .m5  = (float)ode_rotation[4],  // E
+        .m6  = (float)ode_rotation[7],  // H
+        .m7  = 0.0f,
+        
+        // Column 2: C F I 0  
+        .m8  = (float)ode_rotation[2],  // C
+        .m9  = (float)ode_rotation[5],  // F
+        .m10 = (float)ode_rotation[8],  // I
+        .m11 = 0.0f,
+        
+        // Column 3: translation (0,0,0,1) - rotation only
+        .m12 = 0.0f,
+        .m13 = 0.0f,
+        .m14 = 0.0f,
+        .m15 = 1.0f
+    };
+}
+*/
 // Helper function to extract quaternion from 3x3 rotation matrix
+/*
 static Quaternion matrix_to_quaternion(const Matrix *mat) {
     float trace = mat->m0 + mat->m5 + mat->m10;
     
@@ -63,7 +100,7 @@ static Quaternion matrix_to_quaternion(const Matrix *mat) {
         };
     }
 }
-
+*/
 // Callback for collision detection
 static void nearCallback(void *data, dGeomID o1, dGeomID o2) {
     ode_context_t *ctx = (ode_context_t*)data;
@@ -114,40 +151,50 @@ void sync_transform_3d_system(ecs_iter_t *it){
     for (int i = 0; i < it->count; i++) {
         ecs_entity_t e = it->entities[i];
         const dReal *pos = dBodyGetPosition(body[i].id);
-        const dReal *rot_matrix = dBodyGetRotation(body[i].id);
-        
-        // printf("y: %f\n", pos[1]);
-        
+
         // Update position
         transform[i].position = (Vector3){
             .x = (float)pos[0],
             .y = (float)pos[1],
             .z = (float)pos[2]
         };
-        
-        // Convert ODE matrix to raylib Matrix
-        Matrix ode_mat = ode_matrix_to_raylib(rot_matrix);
-        
-        // Extract quaternion from rotation matrix
-        transform[i].rotation = matrix_to_quaternion(&ode_mat);
-        
-        // Normalize quaternion to avoid drift
-        transform[i].rotation = QuaternionNormalize(transform[i].rotation);
-        
-        // Update matrices using raylib functions
-        Matrix rotation_mat = QuaternionToMatrix(transform[i].rotation);
-        Matrix translation_mat = MatrixTranslate(
-            transform[i].position.x, 
-            transform[i].position.y, 
-            transform[i].position.z
-        );
-        
-        // Combine rotation and translation
-        transform[i].localMatrix = MatrixMultiply(rotation_mat, translation_mat);
-        
-        // Scale matrix (assuming uniform scale of 1.0)
-        Matrix scale_mat = MatrixScale(1.0f, 1.0f, 1.0f);
-        transform[i].localMatrix = MatrixMultiply(transform[i].localMatrix, scale_mat);
+
+        // const dReal *rot_matrix = dBodyGetRotation(body[i].id);
+        // dQuaternion ode_quat;
+        const dReal *ode_quat_ptr = dBodyGetQuaternion(body[i].id);
+        // dReal ode_quat[4] = {0}; // Local copy
+        // for (int j = 0; j < 4; j++) {
+        //     ode_quat[j] = ode_quat_ptr[j];
+        // }
+        // // Quaternion x,y,z,w
+        // transform[i].rotation.x = (float)ode_quat[0];
+        // transform[i].rotation.y = (float)ode_quat[1];
+        // transform[i].rotation.z = (float)ode_quat[2];
+        // transform[i].rotation.w = (float)ode_quat[3];
+
+        transform[i].rotation.x = (float)ode_quat_ptr[0];
+        transform[i].rotation.y = (float)ode_quat_ptr[1];
+        transform[i].rotation.z = (float)ode_quat_ptr[2];
+        transform[i].rotation.w = (float)ode_quat_ptr[3];
+
+        // printf("y: %f\n", pos[1]);
+        // Apply translation LAST
+        Matrix translation_mat = MatrixTranslate(transform[i].position.x, transform[i].position.y, transform[i].position.z);
+
+        // If non-uniform, it WILL distort the cube into an ellipsoid
+        Matrix scale_mat = MatrixScale(transform[i].scale.x, transform[i].scale.y, transform[i].scale.z);
+
+        // Apply rotation to the scaled object
+        // Matrix rot_scale = MatrixMultiply(ode_rot_mat, scale_mat);
+        Matrix rot_mat = QuaternionToMatrix(transform[i].rotation);
+
+        // Correct order: Translation * Rotation * Scale
+        transform[i].localMatrix = MatrixMultiply(scale_mat, MatrixMultiply(rot_mat, translation_mat));
+
+        // translation_mat * ( Rotation * Scale) //correct?
+        // Matrix rot_scale = MatrixMultiply(rot_mat, scale_mat);
+        // transform[i].localMatrix = MatrixMultiply(translation_mat, rot_scale);
+
         
         // For now, assume local == world (no parent hierarchy)
         transform[i].worldMatrix = transform[i].localMatrix;
@@ -155,12 +202,12 @@ void sync_transform_3d_system(ecs_iter_t *it){
         // Mark as dirty
         transform[i].isDirty = true;
         
-        // Notify ECS that transform changed
+        // Notify ECS that transform changed // not need since already update.
         // ecs_modified(it->world, e, Transform3D);
     }
 }
 
-// 
+// set up systems ode
 void setup_systems_ode(ecs_world_t *world){
     
     //physics
@@ -189,35 +236,27 @@ void setup_systems_ode(ecs_world_t *world){
     //   .callback = sync_transform_3d_system
     // });
 }
-
-
-// 
+// set up components
 void setup_components_ode(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, ode_body_t);
     ECS_COMPONENT_DEFINE(world, ode_geom_t);
     ECS_COMPONENT_DEFINE(world, ode_context_t);
 }
-
+// set up ode
 void module_init_ode(ecs_world_t *world){
-    printf("init ode\n");
+    // printf("init ode\n");
     setup_components_ode(world);
-
     setup_systems_ode(world);
-
-
     // Initialize ODE
     dInitODE();
     dWorldID ode_world = dWorldCreate();
     dSpaceID space = dHashSpaceCreate(0);
     dJointGroupID contact_group = dJointGroupCreate(0);
     dWorldSetGravity(ode_world, 0, -9.81f, 0);
-
     // Create ode_context_t singleton entity (keep as singleton for Physics system)
     ecs_singleton_set(world, ode_context_t, {
         .world = ode_world,
         .space = space,
         .contact_group = contact_group
     });
-
-
 }
