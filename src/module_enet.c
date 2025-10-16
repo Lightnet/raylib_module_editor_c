@@ -97,12 +97,12 @@ void test_input_enet_system(ecs_iter_t *it){
 // as for need loop it need to make sure the connection retries.
 void network_init_system(ecs_iter_t *it) {
     enet_init_network_tag *init_network = ecs_field(it, enet_init_network_tag, 0);
-
+    printf("init network: %d\n", init_network->is_start);
     if (!init_network) {
         return;
     }
 
-    printf("init network: %d\n", init_network->is_start);
+    
     NetworkConfig *config = ecs_singleton_get_mut(it->world, NetworkConfig);
     NetworkState *state = ecs_singleton_get_mut(it->world, NetworkState);
     if(state->serverStarted || state->clientConnected){
@@ -141,6 +141,7 @@ void network_init_system(ecs_iter_t *it) {
         // ecs_singleton_set(it->world, enet_init_network_tag, NULL);
         ecs_singleton_remove(it->world, enet_init_network_tag);
     } else if (config->isNetwork && !config->isServer && !state->clientConnected) {
+        // this is try again if failed.
         if (enet_initialize() != 0) {
             printf("ENet init failed\n");
             return;
@@ -168,8 +169,8 @@ void network_init_system(ecs_iter_t *it) {
             enet_deinitialize();
             return;
         }
-        state->clientConnected = true;
-        state->isServer = false;
+        state->clientConnected = true;//if there no error mean it connected.
+        state->isServer = false; //this client
         printf("Client attempting connect to %s:%d\n", config->address, config->port);
         ecs_singleton_modified(it->world, NetworkState);
     }
@@ -345,13 +346,14 @@ void network_input_system(ecs_iter_t *it) {
         ecs_singleton_set(it->world, enet_init_network_tag, {0});//init network loop.
     }
     if (IsKeyPressed(KEY_T)) {
+        // client
         if(state->isServer == false && state->clientConnected && state->peer){
             ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(state->peer, 0, packet);
             enet_host_flush(state->host);
             printf("Sent test packet\n");
         }
-
+        // server
         if(config->isNetwork == true && state->isServer == true && state->peer){
             ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
             enet_peer_send(state->peer, 0, packet);
@@ -359,17 +361,73 @@ void network_input_system(ecs_iter_t *it) {
             printf("Sent test packet\n");
         }
     }
+    // state
     if (IsKeyPressed(KEY_Y) && state->clientConnected && state->peer) {
         printf("Client state: %d\n", state->peer->state);
     }
 
-    if (config) {
-        ecs_singleton_modified(it->world, NetworkConfig);
+
+    if (IsKeyPressed(KEY_B)) {
+        //for peer we need to check if peer exist for client connect else error i think.
+        if(config->isNetwork == true && state->isServer == true){
+            ENetPacket *packet = enet_packet_create("[server] test message", strlen("[server] test message") + 1, ENET_PACKET_FLAG_RELIABLE);
+            enet_host_broadcast(state->host,0,packet);
+            enet_host_flush(state->host);
+        }
     }
-    if (state) {
-        ecs_singleton_modified(it->world, NetworkState);
-        
+
+    // server for loop sent messages
+    if (IsKeyPressed(KEY_V)) {
+        // server
+        if(config->isNetwork == true && state->isServer == true){
+            // ENetPacket *packet = enet_packet_create("test message", strlen("test message") + 1, ENET_PACKET_FLAG_RELIABLE);
+            // enet_peer_send(state->peer, 0, packet);
+            // enet_host_flush(state->host);
+            // printf("Sent test packet\n");
+
+            ecs_query_t *q = ecs_query(it->world, {
+                .terms = {
+                    { .id = ecs_id(enet_client_t) }
+                }
+            });
+
+            ecs_iter_t qit = ecs_query_iter(it->world, q);
+            while (ecs_query_next(&qit)) {
+                enet_client_t *client = ecs_field(&qit, enet_client_t, 0);
+                for (int i = 0; i < qit.count; i++) {
+                    // Do the thing
+                    // if (peer[i].peer->connectID == event.peer->connectID){
+                    //     printf("found peer! remove!\n");
+                    //     ecs_delete(it->world, qit.entities[i]);
+                    //     break;
+                    // }
+
+                    if (client[i].peer){
+                        ENetPacket *packet = enet_packet_create("[server] test message", strlen("[server] test message") + 1, ENET_PACKET_FLAG_RELIABLE);
+                        enet_peer_send(client[i].peer, 0, packet);
+                        enet_host_flush(state->host);
+                        printf("Sent test packet\n");
+                    }
+
+
+
+                }
+            }
+            //clean up query
+            ecs_query_fini(q);
+
+        }
     }
+
+
+
+    // ref
+    // if (config) {
+    //     ecs_singleton_modified(it->world, NetworkConfig);
+    // }
+    // if (state) {
+    //     ecs_singleton_modified(it->world, NetworkState);
+    // }
 }
 
 void setup_systems_enet(ecs_world_t *world){

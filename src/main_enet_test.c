@@ -38,6 +38,7 @@ int main(void) {
         .maxPeers = 32,
         .address = "127.0.0.1"
     });
+    // from input test.
     ecs_singleton_set(world, NetworkState, {
         .host = NULL,
         .peer = NULL,
@@ -55,11 +56,13 @@ int main(void) {
     // Cleanup
 
     // Cleanup: Add to end of main (before ecs_fini)
-    // NetworkState *state = ecs_singleton_get(world, NetworkState);
-    // if (state && state->host) {
-    //     enet_host_destroy(state->host);
-    //     enet_deinitialize();
-    // }
+    NetworkState *state = ecs_singleton_get_mut(world, NetworkState);
+    if (state && state->host) {
+        enet_host_destroy(state->host);
+        enet_deinitialize();
+    }
+
+
 
     ecs_fini(world);
     CloseWindow();
