@@ -92,6 +92,12 @@ typedef struct {
 } NetworkState;
 extern ECS_COMPONENT_DECLARE(NetworkState);
 
+// for filter loop to stop checking init network setup.
+typedef struct {
+    int is_start;
+} enet_init_network_tag;
+extern ECS_COMPONENT_DECLARE(enet_init_network_tag);
+
 // Declare event entity as extern for global access
 extern ecs_entity_t event_receive_packed;
 extern ecs_entity_t event_connect_peer;

@@ -52,8 +52,7 @@ void on_reset_cube_system(ecs_iter_t *it) {
     printf("reset! %d\n", current_cube);
     // if(current_cube != 0){
         //resetCubePosition(it->world, current_cube);
-
-
+        
         cube_query = ecs_query(it->world, {
         .terms = {{ ecs_id(ode_body_t) }}
         });

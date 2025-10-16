@@ -18,6 +18,7 @@ ECS_COMPONENT_DECLARE(enet_packet_t);
 ECS_COMPONENT_DECLARE(NetworkConfig);
 ECS_COMPONENT_DECLARE(NetworkState);
 ECS_COMPONENT_DECLARE(enet_client_t);
+ECS_COMPONENT_DECLARE(enet_init_network_tag);
 
 // Declare event entity (defined in setup_components_enet)
 // ecs_entity_t event_receive_packed = 0;
@@ -93,14 +94,28 @@ void test_input_enet_system(ecs_iter_t *it){
 }
 
 // Network initialization system
+// as for need loop it need to make sure the connection retries.
 void network_init_system(ecs_iter_t *it) {
+    enet_init_network_tag *init_network = ecs_field(it, enet_init_network_tag, 0);
+
+    if (!init_network) {
+        return;
+    }
+
+    printf("init network: %d\n", init_network->is_start);
     NetworkConfig *config = ecs_singleton_get_mut(it->world, NetworkConfig);
     NetworkState *state = ecs_singleton_get_mut(it->world, NetworkState);
+    if(state->serverStarted || state->clientConnected){
+        //remove to stop init set up network
+        ecs_singleton_remove(it->world, enet_init_network_tag);
+    }
 
     if (!config || !state) {
         printf("Missing config or state\n");
         return;
     }
+
+    // printf("init network...\n");
 
     if (config->isNetwork && config->isServer && !state->serverStarted) {
         if (enet_initialize() != 0) {
@@ -120,6 +135,11 @@ void network_init_system(ecs_iter_t *it) {
         state->isServer = true;
         printf("Server started on port %d\n", config->port);
         ecs_singleton_modified(it->world, NetworkState);
+        //init_network
+        // ecs_remove(it->world, ecs_id(enet_init_network_tag), ecs_id(enet_init_network_tag));
+        // ecs_remove_id(it->world, 0, ecs_id(enet_init_network_tag));
+        // ecs_singleton_set(it->world, enet_init_network_tag, NULL);
+        ecs_singleton_remove(it->world, enet_init_network_tag);
     } else if (config->isNetwork && !config->isServer && !state->clientConnected) {
         if (enet_initialize() != 0) {
             printf("ENet init failed\n");
@@ -286,7 +306,6 @@ void network_service_system(ecs_iter_t *it) {
     // }
 }
 
-
 // Network input system
 void network_input_system(ecs_iter_t *it) {
     NetworkConfig *config = ecs_singleton_get_mut(it->world, NetworkConfig);
@@ -312,6 +331,7 @@ void network_input_system(ecs_iter_t *it) {
             .address = "127.0.0.1"
         });
         printf("Triggering server start...\n");
+        ecs_singleton_set(it->world, enet_init_network_tag, {0});//init network loop.
     }
     if (IsKeyPressed(KEY_C) && !state->serverStarted && !state->clientConnected) {
         ecs_singleton_set(it->world, NetworkConfig, {
@@ -322,6 +342,7 @@ void network_input_system(ecs_iter_t *it) {
             .address = "127.0.0.1"
         });
         printf("Triggering client connect...\n");
+        ecs_singleton_set(it->world, enet_init_network_tag, {0});//init network loop.
     }
     if (IsKeyPressed(KEY_T)) {
         if(state->isServer == false && state->clientConnected && state->peer){
@@ -347,9 +368,9 @@ void network_input_system(ecs_iter_t *it) {
     }
     if (state) {
         ecs_singleton_modified(it->world, NetworkState);
+        
     }
 }
-
 
 void setup_systems_enet(ecs_world_t *world){
 
@@ -387,8 +408,10 @@ void setup_systems_enet(ecs_world_t *world){
     ecs_system_init(world, &(ecs_system_desc_t){
         .entity = ecs_entity(world, { .name = "network_init_system", .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase)) }),
         .query.terms = {
-            { .id = ecs_id(NetworkConfig), .src.id = ecs_id(NetworkConfig) }, // Singleton
-            { .id = ecs_id(NetworkState), .src.id = ecs_id(NetworkState) }   // Singleton
+            //{ .id = ecs_id(NetworkConfig), .src.id = ecs_id(NetworkConfig) }, // Singleton
+            //{ .id = ecs_id(NetworkState), .src.id = ecs_id(NetworkState) },   // Singleton
+            { .id = ecs_id(enet_init_network_tag), .src.id = ecs_id(enet_init_network_tag) }   // Singleton
+            // { .id = ecs_id(enet_init_network_tag) }   // Singleton
         },
         .callback = network_init_system
     });
@@ -418,12 +441,15 @@ void setup_components_enet(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, NetworkConfig);
     ECS_COMPONENT_DEFINE(world, NetworkState);
     ECS_COMPONENT_DEFINE(world, enet_client_t);
+    ECS_COMPONENT_DEFINE(world, enet_init_network_tag);
 
     // Define the event entity network type
     event_receive_packed = ecs_entity(world, { .name = "receive_packed" });
     event_connect_peer = ecs_entity(world, { .name = "event_connect_peer" });
     event_disconnect_peer = ecs_entity(world, { .name = "event_disconnect_peer" });
     event_disconnect_timeout = ecs_entity(world, { .name = "event_disconnect_timeout" });
+
+    // enet_init_network_tag // struct need to init set up network.
 }
 
 

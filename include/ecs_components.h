@@ -53,6 +53,11 @@ typedef struct {
 } TransformGUI;
 extern ECS_COMPONENT_DECLARE(TransformGUI);
 
+typedef struct {
+    Camera3D camera;
+} main_context_t;
+extern ECS_COMPONENT_DECLARE(main_context_t);
+
 void module_init_raylib(ecs_world_t *world); // Initialization function
 
 #endif // ECS_COMPONENTS_H

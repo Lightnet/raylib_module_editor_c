@@ -1,7 +1,7 @@
 // raylib 5.5
 // flecs v4.1.1
-#define RAYGUI_IMPLEMENTATION
-#define ENET_IMPLEMENTATION
+// #define RAYGUI_IMPLEMENTATION
+// #define ENET_IMPLEMENTATION
 
 #include <stdio.h>
 #include "ecs_components.h"
