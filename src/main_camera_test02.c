@@ -7,30 +7,119 @@
 #include "ecs_components.h"
 #include "module_dev.h"
 
-// Define the SceneContext struct
+
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+#define MOUSE_SENSITIVITY 0.002f
+#define MOVE_SPEED 5.0f
+#define SPRINT_MULTIPLIER 2.0f
+#define CAMERA_FOV 60.0f
+#define CAMERA_MIN_DISTANCE 0.1f
+#define MAX_PITCH 89.0f * DEG2RAD
+
+// Define the name_t struct
 typedef struct {
-    Camera3D camera;
-    // tmp physics; (assuming this is a placeholder, you can add actual physics data later)
-} SceneContext;
+    float yaw;
+    float pitch;
+} camera_controller_t;
+ECS_COMPONENT_DECLARE(camera_controller_t);
 
-
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
+}
 
 void camera_input_system(ecs_iter_t *it){
 
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
+    camera_controller_t *camera_controller = ecs_field(it, camera_controller_t, 1);
 
-
-    // Camera3D *camera = &sceneContext->camera;
-
-    // if (IsCursorHidden()) UpdateCamera(&camera, CAMERA_FIRST_PERSON);
-    if (IsCursorHidden()) UpdateCamera(&main_context->camera, CAMERA_FIRST_PERSON);
-
-    // Toggle camera controls
     if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
     {
         if (IsCursorHidden()) EnableCursor();
         else DisableCursor();
     }
+
+    if(IsCursorHidden()){
+        // printf("...\n");
+        // Get mouse delta (captured mouse movement)
+        Vector2 mouseDelta = GetMouseDelta();
+        
+        // Only update rotation when mouse is captured
+        if (IsWindowFocused())
+        {
+            // Update yaw and pitch from mouse delta
+            camera_controller->yaw += mouseDelta.x * MOUSE_SENSITIVITY;
+            camera_controller->pitch -= mouseDelta.y * MOUSE_SENSITIVITY;
+
+            // Clamp pitch to prevent flipping
+            camera_controller->pitch = Clamp(camera_controller->pitch, -MAX_PITCH, MAX_PITCH);
+
+            printf("pitch:%f yaw:%f\n", camera_controller->pitch, camera_controller->yaw);
+        }
+
+        // Calculate forward direction using spherical coordinates
+        Vector3 forward;
+        forward.x = cosf(camera_controller->yaw) * cosf(camera_controller->pitch);
+        forward.y = sinf(camera_controller->pitch);
+        forward.z = sinf(camera_controller->yaw) * cosf(camera_controller->pitch);
+        forward = Vector3Normalize(forward);
+
+        // Update camera target
+        main_context->camera.target = Vector3Add(main_context->camera.position, forward);
+
+        // Movement input
+        Vector3 velocity = { 0.0f, 0.0f, 0.0f };
+        float speed = MOVE_SPEED;
+
+        // Sprint
+        if (IsKeyDown(KEY_LEFT_SHIFT))
+            speed *= SPRINT_MULTIPLIER;
+
+        // Get normalized forward direction (horizontal)
+        Vector3 forwardFlat = forward;
+        forwardFlat.y = 0.0f;
+        forwardFlat = Vector3Normalize(forwardFlat);
+
+        // Get right vector
+        Vector3 right = Vector3CrossProduct(forwardFlat, main_context->camera.up);
+        right = Vector3Normalize(right);
+
+        // WASD movement
+        if (IsKeyDown(KEY_W))
+            velocity = Vector3Add(velocity, Vector3Scale(forwardFlat, speed));
+        if (IsKeyDown(KEY_S))
+            velocity = Vector3Subtract(velocity, Vector3Scale(forwardFlat, speed));
+        if (IsKeyDown(KEY_A))
+            velocity = Vector3Subtract(velocity, Vector3Scale(right, speed));
+        if (IsKeyDown(KEY_D))
+            velocity = Vector3Add(velocity, Vector3Scale(right, speed));
+
+        // Vertical movement (spectator mode)
+        if (IsKeyDown(KEY_SPACE))
+            velocity.y += speed;
+        if (IsKeyDown(KEY_LEFT_CONTROL))
+            velocity.y -= speed;
+
+        // Apply movement
+        Vector3 movement = Vector3Scale(velocity, GetFrameTime());
+        main_context->camera.position = Vector3Add(main_context->camera.position, movement);
+        main_context->camera.target = Vector3Add(main_context->camera.target, movement);
+
+        // Keep cursor centered
+        SetMousePosition(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+
+    }
+
+    // Camera3D *camera = &sceneContext->camera;
+    // if (IsCursorHidden()) UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+    // if (IsCursorHidden()) UpdateCamera(&main_context->camera, CAMERA_FIRST_PERSON);
+    // // Toggle camera controls
+    // if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+    // {
+    //     if (IsCursorHidden()) EnableCursor();
+    //     else DisableCursor();
+    // }
 }
 
 int main(void) {
@@ -39,9 +128,13 @@ int main(void) {
 
     ecs_world_t *world = ecs_init();
 
+    ECS_COMPONENT_DEFINE(world, camera_controller_t);
+
     // Initialize components and phases
     module_init_raylib(world);
     module_init_dev(world);
+
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
     // Create observer that is invoked whenever Position is set
     // ecs_observer(world, {
@@ -62,9 +155,26 @@ int main(void) {
         .camera = camera
     });
 
+    ecs_singleton_set(world, camera_controller_t, {
+        .yaw = 22.792f,
+        .pitch = -0.592f,
+    });
 
-    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, ecs_id(main_context_t));
-    ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t);
+
+    // does not work incorrect config
+    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t, camera_controller_t);
+    // Input for camera
+    ecs_system_init(world, &(ecs_system_desc_t){
+        .entity = ecs_entity(world, { .name = "network_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .query.terms = {
+            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
+            { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
+        },
+        .callback = camera_input_system
+    });
+
+
+
 
     // setup Input
     // ecs_singleton_set(world, PlayerInput_T, {
