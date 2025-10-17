@@ -619,15 +619,16 @@ void setup_systems(ecs_world_t *world){
         .callback = user_input_system
     });
 
+    // TODO: need to be in debug or dev
     // ONLY 2D
-    ecs_system_init(world, &(ecs_system_desc_t){
-      .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
-      .query.terms = {
-          { .id = ecs_id(Transform3D), .src.id = EcsSelf },
-          { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
-      },
-      .callback = render2d_hud_system
-    });
+    // ecs_system_init(world, &(ecs_system_desc_t){
+    //   .entity = ecs_entity(world, { .name = "render2d_hud_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+    //   .query.terms = {
+    //       { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+    //       { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
+    //   },
+    //   .callback = render2d_hud_system
+    // });
 
     // Transform Hierarchy
     ecs_system_init(world, &(ecs_system_desc_t){

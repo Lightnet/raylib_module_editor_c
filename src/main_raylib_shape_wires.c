@@ -1,8 +1,8 @@
 // raylib 5.5
 // flecs v4.1.1
-// strange rotation for gui
-// y -85 to 85 is cap else it will have strange rotate.
-// note that child does not update the changes. which need parent to update.
+
+// https://www.raylib.com/cheatsheet/cheatsheet.html
+
 #include <stdio.h>
 #include "ecs_components.h"
 #include "module_dev.h"
@@ -23,6 +23,7 @@ typedef struct {
 } camera_controller_t;
 ECS_COMPONENT_DECLARE(camera_controller_t);
 
+// void DrawCubeWires(Vector3 position, float width, float height, float length, Color color);        // Draw cube wires
 typedef struct {
     Vector3 position;
     float width;
@@ -31,6 +32,41 @@ typedef struct {
     Color color;
 } cube_wire_t;
 ECS_COMPONENT_DECLARE(cube_wire_t);
+
+// void DrawCapsule(Vector3 startPos, Vector3 endPos, float radius, int slices, int rings, Color color); // Draw a capsule with the center of its sphere caps at startPos and endPos
+typedef struct {
+    Vector3 position;
+    Vector3 start_pos;
+    Vector3 end_pos;
+    float radius;
+    float height;
+    int slices;
+    int rings;
+    Color color;
+} capsule_wire_t;
+ECS_COMPONENT_DECLARE(capsule_wire_t);
+
+// void DrawSphereWires(Vector3 centerPos, float radius, int rings, int slices, Color color);         // Draw sphere wires
+typedef struct {
+    Vector3 center_pos;
+    float radius;
+    int slices;
+    int rings;
+    Color color;
+} sphere_wire_t;
+ECS_COMPONENT_DECLARE(sphere_wire_t);
+
+// void DrawCylinderWires(Vector3 position, float radiusTop, float radiusBottom, float height, int slices, Color color); // Draw a cylinder/cone wires
+typedef struct {
+    Vector3 position;
+    float radius_top;
+    float radius_bottom;
+    float height; 
+    int slices;
+    Color color;
+} cylinder_wire_t;
+ECS_COMPONENT_DECLARE(cylinder_wire_t);
+
 
 // draw raylib grid
 void render_3d_grid(ecs_iter_t *it){
@@ -139,6 +175,48 @@ void render_3d_draw_cube_wires(ecs_iter_t *it){
     }
 }
 
+// render 3d draw capsule wires
+void render_3d_draw_capsule_wires(ecs_iter_t *it){
+    capsule_wire_t *capsule_wire = ecs_field(it, capsule_wire_t, 0);
+    // Iterate matched entities
+    for (int i = 0; i < it->count; i++) {
+        DrawCapsuleWires(capsule_wire[i].start_pos, 
+                        capsule_wire[i].end_pos,
+                        capsule_wire[i].radius,
+                        capsule_wire[i].slices,
+                        capsule_wire[i].rings,
+                        capsule_wire[i].color);
+    }
+}
+
+// render 3d draw sphere wires
+void render_3d_draw_sphere_wires(ecs_iter_t *it){
+    sphere_wire_t *sphere_wire = ecs_field(it, sphere_wire_t, 0);
+    // Iterate matched entities
+    for (int i = 0; i < it->count; i++) {
+        DrawSphereWires(sphere_wire[i].center_pos, 
+                        sphere_wire[i].radius,
+                        sphere_wire[i].slices,
+                        sphere_wire[i].rings,
+                        sphere_wire[i].color);
+    }
+}
+
+// render 3d draw cylinder wires
+void render_3d_draw_cylinder_wires(ecs_iter_t *it){
+    cylinder_wire_t *cylinder_wire = ecs_field(it, cylinder_wire_t, 0);
+    // Iterate matched entities
+    for (int i = 0; i < it->count; i++) {
+        DrawCylinderWires(cylinder_wire[i].position, 
+                        cylinder_wire[i].radius_top,
+                        cylinder_wire[i].radius_bottom,
+                        cylinder_wire[i].height,
+                        cylinder_wire[i].slices,
+                        cylinder_wire[i].color);
+    }
+}
+
+
 // picking raycast
 void cube_wires_picking_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
@@ -166,7 +244,7 @@ void cube_wires_picking_system(ecs_iter_t *it){
 
 }
 
-
+// draw crosshair
 void render_2d_draw_cross_point(ecs_iter_t *it){
     DrawCircleLines((int)(WINDOW_WIDTH/2), (int)(WINDOW_HEIGHT/2), 8, DARKBLUE);
 }
@@ -180,6 +258,9 @@ int main(void) {
 
     ECS_COMPONENT_DEFINE(world, camera_controller_t);
     ECS_COMPONENT_DEFINE(world, cube_wire_t);
+    ECS_COMPONENT_DEFINE(world, capsule_wire_t);
+    ECS_COMPONENT_DEFINE(world, sphere_wire_t);
+    ECS_COMPONENT_DEFINE(world, cylinder_wire_t);
 
     // Initialize components and phases
     module_init_raylib(world);
@@ -215,6 +296,35 @@ int main(void) {
         .callback = render_3d_draw_cube_wires
     });
 
+    // Render 3D Capsule
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "render_3d_draw_capsule_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
+        .query.terms = {
+            { .id = ecs_id(capsule_wire_t) }, //
+        },
+        .callback = render_3d_draw_capsule_wires
+    });
+
+    // Render 3D Sphere
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "render_3d_draw_sphere_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
+        .query.terms = {
+            { .id = ecs_id(sphere_wire_t) }, //
+        },
+        .callback = render_3d_draw_sphere_wires
+    });
+
+
+    // Render 3D Cylinder
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "render_3d_draw_cylinder_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
+        .query.terms = {
+            { .id = ecs_id(cylinder_wire_t) }, //
+        },
+        .callback = render_3d_draw_cylinder_wires
+    });
+
+
     // picking raycast system
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "cube_wires_picking_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
@@ -230,6 +340,7 @@ int main(void) {
         .entity = ecs_entity(world, { .name = "render_2d_draw_cross_point", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
         .callback = render_2d_draw_cross_point
     });
+
 
     // setup Camera 3D
     Camera3D camera = {
@@ -247,13 +358,7 @@ int main(void) {
         .yaw = 22.792f,
         .pitch = -0.592f,
     });
-
-
-    // setup Input
-    // ecs_singleton_set(world, PlayerInput_T, {
-    //   .isMovementMode=true,
-    //   .tabPressed=false
-    // });
+    
 
     ecs_entity_t cube_wired_1 = ecs_entity(world, {
       .name = "CubeWire1"
@@ -279,74 +384,44 @@ int main(void) {
     });
 
 
-    // create Model
-    // Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    ecs_entity_t capsule_wired_1 = ecs_entity(world, {
+      .name = "Capsule"
+    });
+    ecs_set(world, capsule_wired_1, capsule_wire_t, {
+        .position = (Vector3) {0,2,0},
+        .start_pos = (Vector3) {0,0,0},
+        .end_pos = (Vector3) {0,2,0},
+        .radius = 1.0f,
+        .height = 2.0f,
+        .slices = 8,
+        .rings = 8,
+        .color = BLACK
+    });
 
-    // Create Entity
-    // ecs_entity_t node1 = ecs_entity(world, {
-    //   .name = "NodeParent"
-    // });
 
-    // ecs_set(world, node1, Transform3D, {
-    //     .position = (Vector3){0.0f, 0.0f, 0.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){1.0f, 1.0f, 1.0f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node1, ModelComponent, {&cube});
-    
-    // // Create Entity to parent to NodeParent
-    // ecs_entity_t node2 = ecs_entity(world, {
-    //     .name = "NodeChild",
-    //     .parent = node1
-    // });
-    // ecs_set(world, node2, Transform3D, {
-    //     .position = (Vector3){2.0f, 0.0f, 0.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node2, ModelComponent, {&cube});
-    
-    // // Create Entity to parent to NodeParent
-    // ecs_entity_t node3 = ecs_entity(world, {
-    //     .name = "Node3",
-    //     .parent = node1
-    // });
-    // ecs_set(world, node3, Transform3D, {
-    //     .position = (Vector3){2.0f, 0.0f, 2.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node3, ModelComponent, {&cube});
+    ecs_entity_t sphere_wired_1 = ecs_entity(world, {
+      .name = "Sphere1"
+    });
+    ecs_set(world, sphere_wired_1, sphere_wire_t, {
+        .center_pos = (Vector3) {2,2,0},
+        .radius = 2.0f,
+        .slices = 8,
+        .rings = 8,
+        .color = YELLOW
+    });
 
-    // // Create Entity to parent to NodeChild
-    // ecs_entity_t node4 = ecs_entity(world, {
-    //     .name = "NodeGrandchild",
-    //     .parent = node2
-    // });
-    // ecs_set(world, node4, Transform3D, {
-    //     .position = (Vector3){1.0f, 0.0f, 1.0f},
-    //     .rotation = QuaternionIdentity(),
-    //     .scale = (Vector3){0.5f, 0.5f, 0.5f},
-    //     .localMatrix = MatrixIdentity(),
-    //     .worldMatrix = MatrixIdentity(),
-    //     .isDirty = true
-    // });
-    // ecs_set(world, node4, ModelComponent, {&cube});
+    ecs_entity_t cylinder_wired_1 = ecs_entity(world, {
+      .name = "cylinder"
+    });
+    ecs_set(world, cylinder_wired_1, cylinder_wire_t, {
+        .position = (Vector3) {2,2,0},
+        .radius_top = 2.0f,
+        .radius_bottom = 2.0f,
+        .height = 2.0f,
+        .slices = 8,
+        .color = ORANGE
+    });
 
-    // ecs_entity_t gui = ecs_new(world);
-    // ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
-    // ecs_set(world, gui, TransformGUI, {
-    //     .id = node1  // Reference the id entity
-    // });
 
     //Loop Logic and render
     while (!WindowShouldClose()) {

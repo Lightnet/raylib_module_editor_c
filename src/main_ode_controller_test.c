@@ -1,5 +1,7 @@
 // raylib 5.5
 // flecs v4.1.1
+
+
 // #define RAYGUI_IMPLEMENTATION
 #include <stdio.h>
 #include "ecs_components.h"
@@ -17,22 +19,18 @@ typedef struct {
 ECS_COMPONENT_DECLARE(ResetRequest);
 
 // Convert Transform3D to raylib Matrix for rendering
-static Matrix transform3d_to_raylib_matrix(const Transform3D *transform) {
-    // Create scale matrix
-    Matrix scale_mat = MatrixScale(transform->scale.x, transform->scale.y, transform->scale.z);
-    
-    // Create rotation matrix
-    Matrix rot_mat = QuaternionToMatrix(transform->rotation);
-    
-    // Create translation matrix
-    Matrix trans_mat = MatrixTranslate(transform->position.x, transform->position.y, transform->position.z);
-    
-    // Combine: scale -> rotation -> translation (standard order)
-    Matrix result = MatrixMultiply(rot_mat, scale_mat);
-    result = MatrixMultiply(trans_mat, result);
-    
-    return result;
-}
+// static Matrix transform3d_to_raylib_matrix(const Transform3D *transform) {
+//     // Create scale matrix
+//     Matrix scale_mat = MatrixScale(transform->scale.x, transform->scale.y, transform->scale.z);
+//     // Create rotation matrix
+//     Matrix rot_mat = QuaternionToMatrix(transform->rotation);
+//     // Create translation matrix
+//     Matrix trans_mat = MatrixTranslate(transform->position.x, transform->position.y, transform->position.z);
+//     // Combine: scale -> rotation -> translation (standard order)
+//     Matrix result = MatrixMultiply(rot_mat, scale_mat);
+//     result = MatrixMultiply(trans_mat, result);
+//     return result;
+// }
 
 // Function to reset cube position randomly
 void reset_cube_position(ecs_world_t *ecs_world, ecs_entity_t entity) {
