@@ -333,7 +333,6 @@ void GUI_Transform3D_System(ecs_iter_t *it) {
     }
 }
 
-
 // System to process specific child entities (e.g., triggered by GUI)
 void UpdateChildOnly_gui_System(ecs_iter_t *it) {
     TransformGUI *guis = ecs_field(it, TransformGUI, 0);
@@ -344,18 +343,6 @@ void UpdateChildOnly_gui_System(ecs_iter_t *it) {
         }
     }
 }
-
-// System to process specific child entities (e.g., triggered by GUI)
-void update_child_only_system(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t entity = guis[i].id;
-        if (ecs_is_valid(it->world, entity) && ecs_has(it->world, entity, Transform3D)) {
-            UpdateChildTransformOnly(it->world, entity);
-        }
-    }
-}
-
 
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
@@ -404,18 +391,6 @@ int main(void) {
           { .id = ecs_pair(EcsChildOf, EcsWildcard), .oper = EcsNot }
       },
       .callback = render2d_hud_system
-    });
-
-    // Child Transform 3D Hierarchy
-    ecs_system(world, {
-        .entity = ecs_entity(world, {
-            .name = "update_child_only_system",
-            .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase))
-        }),
-        .query.terms = {
-            { .id = ecs_id(TransformGUI), .src.id = EcsSelf }
-        },
-        .callback = update_child_only_system
     });
 
     ECS_SYSTEM(world, GUI_Transform3D_System, RLRender2D1Phase, TransformGUI);

@@ -3,8 +3,6 @@
 // #define RAYGUI_IMPLEMENTATION
 #include <stdio.h>
 #include "ecs_components.h"
-// #include "module_dev.h"
-// #include "module_enet.h"
 #include "module_ode.h"
 #include "raygui.h"
 
@@ -65,6 +63,7 @@ ECS_COMPONENT_DECLARE(ResetRequest);
 //     return result;
 // }
 
+// spector camera 3d
 void camera_input_system(ecs_iter_t *it){
 
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
@@ -274,6 +273,7 @@ void render_2d_ode_gui(ecs_iter_t *it){
     }
 }
 
+// on event add ode physics
 void on_add_ode_box(ecs_iter_t *it){
     const ode_context_t *ode_context = ecs_singleton_get_mut(it->world, ode_context_t);
     const rl_model_t *rl_model = ecs_singleton_get_mut(it->world, rl_model_t);
@@ -297,6 +297,7 @@ void on_add_ode_box(ecs_iter_t *it){
     }
 }
 
+// on event remove ode physics
 void on_remove_ode_box(ecs_iter_t *it){
     printf("remove ode_box\n");
     ode_box_t *ode_box = ecs_field(it, ode_box_t, 0);
@@ -315,8 +316,7 @@ void on_remove_ode_box(ecs_iter_t *it){
     }
 }
 
-
-
+// main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -363,8 +363,6 @@ int main(void) {
         .events = { EcsOnRemove },
         .callback = on_remove_ode_box
     });
-
-
 
     // Input
     ecs_system(world, {

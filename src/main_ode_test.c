@@ -3,36 +3,31 @@
 // #define RAYGUI_IMPLEMENTATION
 #include <stdio.h>
 #include "ecs_components.h"
-// #include "module_dev.h"
-// #include "module_enet.h"
 #include "module_ode.h"
+
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+#define MOUSE_SENSITIVITY 0.002f
+#define MOVE_SPEED 5.0f
+#define SPRINT_MULTIPLIER 2.0f
+#define CAMERA_FOV 60.0f
+#define CAMERA_MIN_DISTANCE 0.1f
+#define MAX_PITCH 89.0f * DEG2RAD
 
 ecs_entity_t reset_t;
 ecs_entity_t current_cube;
 static ecs_query_t *cube_query = NULL;
 
 typedef struct {
+    float yaw;
+    float pitch;
+} camera_controller_t;
+ECS_COMPONENT_DECLARE(camera_controller_t);
+
+typedef struct {
     bool reset_requested;
 } ResetRequest;
 ECS_COMPONENT_DECLARE(ResetRequest);
-
-// Convert Transform3D to raylib Matrix for rendering
-static Matrix transform3d_to_raylib_matrix(const Transform3D *transform) {
-    // Create scale matrix
-    Matrix scale_mat = MatrixScale(transform->scale.x, transform->scale.y, transform->scale.z);
-    
-    // Create rotation matrix
-    Matrix rot_mat = QuaternionToMatrix(transform->rotation);
-    
-    // Create translation matrix
-    Matrix trans_mat = MatrixTranslate(transform->position.x, transform->position.y, transform->position.z);
-    
-    // Combine: scale -> rotation -> translation (standard order)
-    Matrix result = MatrixMultiply(rot_mat, scale_mat);
-    result = MatrixMultiply(trans_mat, result);
-    
-    return result;
-}
 
 // Function to reset cube position randomly
 void reset_cube_position(ecs_world_t *ecs_world, ecs_entity_t entity) {
@@ -107,12 +102,108 @@ void render_3d_grid(ecs_iter_t *it){
     DrawGrid(10, 1.0f);
 }
 
+// spector camera 3d
+void camera_input_system(ecs_iter_t *it){
+
+    main_context_t *main_context = ecs_field(it, main_context_t, 0);
+    camera_controller_t *camera_controller = ecs_field(it, camera_controller_t, 1);
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+    {
+        if (IsCursorHidden()) EnableCursor();
+        else DisableCursor();
+    }
+
+    if(IsCursorHidden()){
+        // printf("...\n");
+        // Get mouse delta (captured mouse movement)
+        Vector2 mouseDelta = GetMouseDelta();
+        
+        // Only update rotation when mouse is captured
+        if (IsWindowFocused())
+        {
+            // Update yaw and pitch from mouse delta
+            camera_controller->yaw += mouseDelta.x * MOUSE_SENSITIVITY;
+            camera_controller->pitch -= mouseDelta.y * MOUSE_SENSITIVITY;
+
+            // Clamp pitch to prevent flipping
+            camera_controller->pitch = Clamp(camera_controller->pitch, -MAX_PITCH, MAX_PITCH);
+
+            // printf("pitch:%f yaw:%f\n", camera_controller->pitch, camera_controller->yaw);
+        }
+
+        // Calculate forward direction using spherical coordinates
+        Vector3 forward;
+        forward.x = cosf(camera_controller->yaw) * cosf(camera_controller->pitch);
+        forward.y = sinf(camera_controller->pitch);
+        forward.z = sinf(camera_controller->yaw) * cosf(camera_controller->pitch);
+        forward = Vector3Normalize(forward);
+
+        // Update camera target
+        main_context->camera.target = Vector3Add(main_context->camera.position, forward);
+
+        // Movement input
+        Vector3 velocity = { 0.0f, 0.0f, 0.0f };
+        float speed = MOVE_SPEED;
+
+        // Sprint
+        if (IsKeyDown(KEY_LEFT_SHIFT))
+            speed *= SPRINT_MULTIPLIER;
+
+        // Get normalized forward direction (horizontal)
+        Vector3 forwardFlat = forward;
+        forwardFlat.y = 0.0f;
+        forwardFlat = Vector3Normalize(forwardFlat);
+
+        // Get right vector
+        Vector3 right = Vector3CrossProduct(forwardFlat, main_context->camera.up);
+        right = Vector3Normalize(right);
+
+        // WASD movement
+        if (IsKeyDown(KEY_W))
+            velocity = Vector3Add(velocity, Vector3Scale(forwardFlat, speed));
+        if (IsKeyDown(KEY_S))
+            velocity = Vector3Subtract(velocity, Vector3Scale(forwardFlat, speed));
+        if (IsKeyDown(KEY_A))
+            velocity = Vector3Subtract(velocity, Vector3Scale(right, speed));
+        if (IsKeyDown(KEY_D))
+            velocity = Vector3Add(velocity, Vector3Scale(right, speed));
+
+        // Vertical movement (spectator mode)
+        if (IsKeyDown(KEY_SPACE))
+            velocity.y += speed;
+        if (IsKeyDown(KEY_LEFT_CONTROL))
+            velocity.y -= speed;
+
+        // Apply movement
+        Vector3 movement = Vector3Scale(velocity, GetFrameTime());
+        main_context->camera.position = Vector3Add(main_context->camera.position, movement);
+        main_context->camera.target = Vector3Add(main_context->camera.target, movement);
+
+        // Keep cursor centered
+        SetMousePosition(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2);
+
+    }
+
+    // Camera3D *camera = &sceneContext->camera;
+    // if (IsCursorHidden()) UpdateCamera(&camera, CAMERA_FIRST_PERSON);
+    // if (IsCursorHidden()) UpdateCamera(&main_context->camera, CAMERA_FIRST_PERSON);
+    // // Toggle camera controls
+    // if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+    // {
+    //     if (IsCursorHidden()) EnableCursor();
+    //     else DisableCursor();
+    // }
+}
+
+// main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
 
     ecs_world_t *world = ecs_init();
 
+    ECS_COMPONENT_DEFINE(world, camera_controller_t);
     ECS_COMPONENT_DEFINE(world, ResetRequest);
 
     reset_t = ecs_entity(world, { .name = "reset" });
@@ -136,11 +227,18 @@ int main(void) {
         .callback = on_reset_cube_system
     });
 
-    // In your module init
-    // ECS_SYSTEM(world, render_transform_3d_system, RLEndMode3DPhase, Transform3D);
+    // Input for camera
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "camera_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .query.terms = {
+            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
+            { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
+        },
+        .callback = camera_input_system
+    });
 
     // Input
-    ecs_system_init(world, &(ecs_system_desc_t){
+    ecs_system(world, {
       .entity = ecs_entity(world, { .name = "test_input_system", .add = ecs_ids(ecs_dependson(EcsOnUpdate)) }),
       .callback = test_input_system
     });
@@ -155,6 +253,10 @@ int main(void) {
     };
     ecs_singleton_set(world, main_context_t, {
         .camera = camera
+    });
+    ecs_singleton_set(world, camera_controller_t, {
+        .yaw = 22.792f,
+        .pitch = -0.592f,
     });
 
     const ode_context_t *ode_context = ecs_singleton_get_mut(world, ode_context_t);
@@ -198,9 +300,6 @@ int main(void) {
     current_cube = cube;
     reset_cube_position(world, cube);
 
-
-
-
     // Create Entity
     ecs_entity_t node1 = ecs_entity(world, {
       .name = "NodeParent"
@@ -217,19 +316,12 @@ int main(void) {
     ecs_set(world, node1, ModelComponent, {&cuber});
 
 
-
-
     //Loop Logic and render
     while (!WindowShouldClose()) {
       ecs_progress(world, 0);
     }
 
-    // Cleanup: Add to end of main (before ecs_fini)
-    // if (g_host) {
-    //   enet_host_destroy(g_host);
-    //   enet_deinitialize();
-    // }
-
+    //clean up
     ecs_fini(world);
     CloseWindow();
     return 0;

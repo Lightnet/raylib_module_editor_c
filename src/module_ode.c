@@ -183,25 +183,19 @@ void sync_transform_3d_system(ecs_iter_t *it){
         // Apply translation LAST
         Matrix translation_mat = MatrixTranslate(transform[i].position.x, transform[i].position.y, transform[i].position.z);
 
-        // If non-uniform, it WILL distort the cube into an ellipsoid
+        // // If non-uniform, it WILL distort the cube into an ellipsoid
         Matrix scale_mat = MatrixScale(transform[i].scale.x, transform[i].scale.y, transform[i].scale.z);
 
-        // Apply rotation to the scaled object
-        // Matrix rot_scale = MatrixMultiply(ode_rot_mat, scale_mat);
+        // // Apply rotation to the scaled object
         Matrix rot_mat = QuaternionToMatrix(transform[i].rotation);
 
-        // Correct order: Translation * Rotation * Scale
-        transform[i].localMatrix = MatrixMultiply(scale_mat, MatrixMultiply(rot_mat, translation_mat));
+        // // Correct order: Translation * Rotation * Scale ??
+        // transform[i].localMatrix = MatrixMultiply(scale_mat, MatrixMultiply(rot_mat, translation_mat));
 
-        // translation_mat * ( Rotation * Scale) //correct?
-        // Matrix rot_scale = MatrixMultiply(rot_mat, scale_mat);
-        // transform[i].localMatrix = MatrixMultiply(translation_mat, rot_scale);
-
+        // // For now, assume local == world (no parent hierarchy)
+        // transform[i].worldMatrix = transform[i].localMatrix;
         
-        // For now, assume local == world (no parent hierarchy)
-        transform[i].worldMatrix = transform[i].localMatrix;
-        
-        // Mark as dirty
+        // // Mark as dirty
         transform[i].isDirty = true;
         
         // Notify ECS that transform changed // not need since already update.
