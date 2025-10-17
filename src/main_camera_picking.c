@@ -7,7 +7,6 @@
 #include "ecs_components.h"
 #include "module_dev.h"
 
-
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define MOUSE_SENSITIVITY 0.002f
@@ -24,13 +23,22 @@ typedef struct {
 } camera_controller_t;
 ECS_COMPONENT_DECLARE(camera_controller_t);
 
+typedef struct {
+    Vector3 position;
+    float width;
+    float height;
+    float length;
+    Color color;
+} cube_wire_t;
+ECS_COMPONENT_DECLARE(cube_wire_t);
+
 // draw raylib grid
 void render_3d_grid(ecs_iter_t *it){
     DrawGrid(10, 1.0f);
 }
 
+// camera input
 void camera_input_system(ecs_iter_t *it){
-
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
     camera_controller_t *camera_controller = ecs_field(it, camera_controller_t, 1);
 
@@ -55,7 +63,7 @@ void camera_input_system(ecs_iter_t *it){
             // Clamp pitch to prevent flipping
             camera_controller->pitch = Clamp(camera_controller->pitch, -MAX_PITCH, MAX_PITCH);
 
-            printf("pitch:%f yaw:%f\n", camera_controller->pitch, camera_controller->yaw);
+            // printf("pitch:%f yaw:%f\n", camera_controller->pitch, camera_controller->yaw);
         }
 
         // Calculate forward direction using spherical coordinates
@@ -122,6 +130,48 @@ void camera_input_system(ecs_iter_t *it){
     // }
 }
 
+// render 3d draw cube wires
+void render_3d_draw_cube_wires(ecs_iter_t *it){
+    cube_wire_t *cube_wire = ecs_field(it, cube_wire_t, 0);
+    // Iterate matched entities
+    for (int i = 0; i < it->count; i++) {
+        DrawCubeWires(cube_wire[i].position, cube_wire[i].width,cube_wire[i].height,cube_wire[i].length,cube_wire[i].color);
+    }
+}
+
+// picking raycast
+void cube_wires_picking_system(ecs_iter_t *it){
+    main_context_t *main_context = ecs_field(it, main_context_t, 0);
+    cube_wire_t *cube_wire = ecs_field(it, cube_wire_t, 1);
+
+    Ray ray = { 0 };                    // Picking line ray
+    RayCollision collision = { 0 };     // Ray collision hit info
+
+
+    ray = GetScreenToWorldRay(GetMousePosition(), main_context->camera);
+
+    // Iterate matched entities
+    for (int i = 0; i < it->count; i++) {
+        DrawCubeWires(cube_wire[i].position, cube_wire[i].width,cube_wire[i].height,cube_wire[i].length, cube_wire[i].color);
+        collision = GetRayCollisionBox(ray,
+            (BoundingBox){(Vector3){ cube_wire[i].position.x - cube_wire[i].width/2, cube_wire[i].position.y - cube_wire[i].height/2, cube_wire[i].position.z - cube_wire[i].length/2 },
+                          (Vector3){ cube_wire[i].position.x + cube_wire[i].width/2, cube_wire[i].position.y + cube_wire[i].height/2, cube_wire[i].position.z + cube_wire[i].length/2 }} );
+        if (collision.hit){
+            cube_wire[i].color = GREEN;
+        }else{
+            cube_wire[i].color = GRAY;
+        }
+    }
+
+
+}
+
+
+void render_2d_draw_cross_point(ecs_iter_t *it){
+    DrawCircleLines((int)(WINDOW_WIDTH/2), (int)(WINDOW_HEIGHT/2), 8, DARKBLUE);
+}
+
+// 
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -129,6 +179,7 @@ int main(void) {
     ecs_world_t *world = ecs_init();
 
     ECS_COMPONENT_DEFINE(world, camera_controller_t);
+    ECS_COMPONENT_DEFINE(world, cube_wire_t);
 
     // Initialize components and phases
     module_init_raylib(world);
@@ -142,6 +193,55 @@ int main(void) {
     //     .events = { EcsOnAdd },
     //     .callback = on_add_entity
     // });
+
+    // does not work incorrect config
+    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t, camera_controller_t);
+    // Input for camera
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "network_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .query.terms = {
+            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
+            { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
+        },
+        .callback = camera_input_system
+    });
+
+    // Render 3D Cube
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "render_3d_draw_cube_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
+        .query.terms = {
+            { .id = ecs_id(cube_wire_t) }, //
+            // { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
+        },
+        .callback = render_3d_draw_cube_wires
+    });
+
+    // draw cube wireframe
+    ecs_system(world,{
+        .entity = ecs_entity(world, { .name = "render_3d_draw_cube_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
+        .query.terms = {
+            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }   // Singleton
+        },
+        .callback = render_3d_draw_cube_wires
+    });
+
+    // picking raycast system
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "cube_wires_picking_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .query.terms = {
+            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
+            { .id = ecs_id(cube_wire_t) }   //
+        },
+        .callback = cube_wires_picking_system
+    });
+
+    // draw center
+    ecs_system(world, {
+        .entity = ecs_entity(world, { .name = "render_2d_draw_cross_point", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+        .callback = render_2d_draw_cross_point
+    });
+
+
 
     // setup Camera 3D
     Camera3D camera = {
@@ -161,41 +261,53 @@ int main(void) {
     });
 
 
-    // does not work incorrect config
-    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t, camera_controller_t);
-    // Input for camera
-    ecs_system_init(world, &(ecs_system_desc_t){
-        .entity = ecs_entity(world, { .name = "network_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
-        .query.terms = {
-            { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
-            { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
-        },
-        .callback = camera_input_system
-    });
-
     // setup Input
     // ecs_singleton_set(world, PlayerInput_T, {
     //   .isMovementMode=true,
     //   .tabPressed=false
     // });
 
+    ecs_entity_t cube_wired_1 = ecs_entity(world, {
+      .name = "CubeWire1"
+    });
+    ecs_set(world, cube_wired_1, cube_wire_t, {
+        .position = (Vector3) {0,0,0},
+        .width = 1.0f,
+        .height = 1.0f,
+        .length = 1.0f,
+        .color = BLUE
+    });
+
+
+    ecs_entity_t cube_wired_2 = ecs_entity(world, {
+      .name = "CubeWire2"
+    });
+    ecs_set(world, cube_wired_2, cube_wire_t, {
+        .position = (Vector3) {0,2,0},
+        .width = 1.0f,
+        .height = 1.0f,
+        .length = 1.0f,
+        .color = RED
+    });
+
+
     // create Model
-    Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    // Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
 
     // Create Entity
-    ecs_entity_t node1 = ecs_entity(world, {
-      .name = "NodeParent"
-    });
+    // ecs_entity_t node1 = ecs_entity(world, {
+    //   .name = "NodeParent"
+    // });
 
-    ecs_set(world, node1, Transform3D, {
-        .position = (Vector3){0.0f, 0.0f, 0.0f},
-        .rotation = QuaternionIdentity(),
-        .scale = (Vector3){1.0f, 1.0f, 1.0f},
-        .localMatrix = MatrixIdentity(),
-        .worldMatrix = MatrixIdentity(),
-        .isDirty = true
-    });
-    ecs_set(world, node1, ModelComponent, {&cube});
+    // ecs_set(world, node1, Transform3D, {
+    //     .position = (Vector3){0.0f, 0.0f, 0.0f},
+    //     .rotation = QuaternionIdentity(),
+    //     .scale = (Vector3){1.0f, 1.0f, 1.0f},
+    //     .localMatrix = MatrixIdentity(),
+    //     .worldMatrix = MatrixIdentity(),
+    //     .isDirty = true
+    // });
+    // ecs_set(world, node1, ModelComponent, {&cube});
     
     // // Create Entity to parent to NodeParent
     // ecs_entity_t node2 = ecs_entity(world, {
@@ -253,7 +365,7 @@ int main(void) {
       ecs_progress(world, 0);
     }
 
-    UnloadModel(cube);
+    // UnloadModel(cube);
     ecs_fini(world);
     CloseWindow();
     return 0;

@@ -24,7 +24,6 @@ ECS_COMPONENT_DECLARE(TransformGUI);
 ECS_COMPONENT_DECLARE(main_context_t);
 
 // Helper function to update a single transform
-// Helper function to update a single transform
 void UpdateTransform(ecs_world_t *world, ecs_entity_t entity, Transform3D *transform) {
   // Get parent entity
   ecs_entity_t parent = ecs_get_parent(world, entity);
