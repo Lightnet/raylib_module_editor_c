@@ -18,6 +18,12 @@ extern ecs_entity_t RLEndMode3DPhase;
 extern ecs_entity_t RLRender2D1Phase;
 extern ecs_entity_t RLEndDrawingPhase;
 
+// raylib camera 3d
+typedef struct {
+    Camera3D camera;
+} main_context_t;
+extern ECS_COMPONENT_DECLARE(main_context_t);
+
 // Transform3D component
 typedef struct {
     Vector3 position;         // Local position
@@ -35,29 +41,26 @@ typedef struct {
 } ModelComponent;
 extern ECS_COMPONENT_DECLARE(ModelComponent);
 
-// PlayerInput_T component
-typedef struct {
-    bool isMovementMode;
-    bool tabPressed;
-    bool moveForward;
-    bool moveBackward;
-    bool moveLeft;
-    bool moveRight;
-} PlayerInput_T;
-extern ECS_COMPONENT_DECLARE(PlayerInput_T);
+// // PlayerInput_T component
+// typedef struct {
+//     bool isMovementMode;
+//     bool tabPressed;
+//     bool moveForward;
+//     bool moveBackward;
+//     bool moveLeft;
+//     bool moveRight;
+// } PlayerInput_T;
+// extern ECS_COMPONENT_DECLARE(PlayerInput_T);
 
-// TransformGUI component
-typedef struct {
-    ecs_entity_t id;          // Entity to edit
-    int selectedIndex;        // Index of the selected entity in the list
-} TransformGUI;
-extern ECS_COMPONENT_DECLARE(TransformGUI);
+// // TransformGUI component
+// typedef struct {
+//     ecs_entity_t id;          // Entity to edit
+//     int selectedIndex;        // Index of the selected entity in the list
+// } TransformGUI;
+// extern ECS_COMPONENT_DECLARE(TransformGUI);
 
-typedef struct {
-    Camera3D camera;
-} main_context_t;
-extern ECS_COMPONENT_DECLARE(main_context_t);
 
 void module_init_raylib(ecs_world_t *world); // Initialization function
+void UpdateChildTransformOnly(ecs_world_t *world, ecs_entity_t entity);
 
 #endif // ECS_COMPONENTS_H

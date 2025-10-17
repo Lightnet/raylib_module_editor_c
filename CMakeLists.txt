@@ -339,14 +339,14 @@ if(${EXPORT_FLECS_APP})
         ${SRC_FLECS_MODULES}
         # src/main_camera_capsule.c
         # src/main_raylib_shape_wires.c
-        src/main_ode_gui_test.c
+        # src/main_ode_gui_test.c
         # src/main_camera_picking.c
         # src/main_camera_test01.c
         # src/main_camera_test02.c
         # src/main_editor_test.c
         # src/main_enet_test.c
         # src/main_ode_test.c
-        # src/main_transform_3d_hierarchy_test.c
+        src/main_transform_3d_hierarchy_test.c
         # src/main.c
     )
 
