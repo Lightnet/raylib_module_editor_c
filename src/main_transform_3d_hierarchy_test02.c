@@ -23,21 +23,29 @@ ECS_COMPONENT_DECLARE(player_input_transform_3d_t);
 typedef struct {
     ecs_entity_t id;          // Entity to edit
     int selectedIndex;        // Index of the selected entity in the list
-} TransformGUI;
-ECS_COMPONENT_DECLARE(TransformGUI);
+} transform_3d_gui_t;
+ECS_COMPONENT_DECLARE(transform_3d_gui_t);
 
 void user_input_system(ecs_iter_t *it) {
-    player_input_transform_3d_t *pi_ctx = ecs_singleton_ensure(it->world, player_input_transform_3d_t);
-    if (!pi_ctx) return;
+    // player_input_transform_3d_t *pi_ctx = ecs_singleton_ensure(it->world, player_input_transform_3d_t);
+    // if (!pi_ctx) return;
 
-    Transform3D *t = ecs_field(it, Transform3D, 0);
+    player_input_transform_3d_t *pi_ctx = ecs_field(it, player_input_transform_3d_t, 0);
+    transform_3d_gui_t *transform_3d_gui = ecs_field(it, transform_3d_gui_t, 1);
+
+    if(!transform_3d_gui){
+        return;
+    }
+
+    Transform3D *t = ecs_field(it, Transform3D, 2);
     float dt = GetFrameTime();
     //test user input
     for (int i = 0; i < it->count; i++) {
       const char *name = ecs_get_name(it->world, it->entities[i]);
       if (name) {
         bool isFound = false;
-        if (strcmp(name, "NodeParent") == 0) {
+        // if (strcmp(name, "NodeParent") == 0) {
+        if( it->entities[i] == transform_3d_gui->id){
 
           bool wasModified = false;
 
@@ -116,11 +124,13 @@ void render2d_hud_system(ecs_iter_t *it){
   DrawFPS(10, 70);
 }
 
-void GUI_Transform3D_List_System(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
+void transform_3D_gui_list_system(ecs_iter_t *it) {
+    // transform_3d_gui_t *guis = ecs_field(it, transform_3d_gui_t, 0);
+    transform_3d_gui_t *gui = ecs_field(it, transform_3d_gui_t, 0);
+    // printf("gui\n");
 
-    for (int i = 0; i < it->count; i++) {
-        TransformGUI *gui = &guis[i];
+    // for (int i = 0; i < it->count; i++) {
+        // transform_3d_gui_t *gui = &guis[i];
 
         // Create a query for all entities with Transform3D
         ecs_query_t *query = ecs_query(it->world, {
@@ -164,20 +174,20 @@ void GUI_Transform3D_List_System(ecs_iter_t *it) {
         // printf("Name list: %s\n", name_list);
 
         // Draw the list view on the left side
-        Rectangle list_rect = {560, 10, 240, 580};
+        Rectangle list_rect = {560, 20, 240, 200};
         int scroll_index = 0;
         int prev_selected_index = gui->selectedIndex; // Store previous index for comparison
 
         // Debug: Print current selected index before GuiListView
         // printf("Before GuiListView - Current selectedIndex: %d\n", gui->selectedIndex);
 
-        GuiGroupBox(list_rect, "Entity List");
+        
         GuiListView(list_rect, name_list, &scroll_index, &gui->selectedIndex);
 
         // Debug: Print gui->selectedIndex after GuiListView
         // printf("After GuiListView - gui->selectedIndex: %d\n", gui->selectedIndex);
 
-        // Update TransformGUI.id if the selection changed
+        // Update transform_3d_gui_t.id if the selection changed
         if (gui->selectedIndex >= 0 && gui->selectedIndex < entity_count && ecs_is_valid(it->world, entity_ids[gui->selectedIndex])) {
             if (gui->id != entity_ids[gui->selectedIndex] || gui->selectedIndex != prev_selected_index) {
                 gui->id = entity_ids[gui->selectedIndex];
@@ -196,6 +206,7 @@ void GUI_Transform3D_List_System(ecs_iter_t *it) {
             //        gui->selectedIndex, entity_count,
             //        gui->selectedIndex < entity_count ? ecs_is_valid(it->world, entity_ids[gui->selectedIndex]) : 0);
         }
+        GuiGroupBox(list_rect, "Entity List");
 
         // Clean up
         for (int j = 0; j < entity_count; j++) {
@@ -207,143 +218,134 @@ void GUI_Transform3D_List_System(ecs_iter_t *it) {
 
         // Free the query
         ecs_query_fini(query);
-    }
+    // }
 }
 
 // transform 3d position, rotate, scale.
-void GUI_Transform3D_System(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);  // Field index 0
+void transform_3D_gui_system(ecs_iter_t *it) {
+    transform_3d_gui_t *gui = ecs_field(it, transform_3d_gui_t, 0);  // Field index 0
 
-    for (int i = 0; i < it->count; i++) {
-        TransformGUI *gui = &guis[i];
+    // Check if the referenced entity exists
+    if (!ecs_is_valid(it->world, gui->id)) {
+        // Disable GUI if entity doesn’t exist
+        return;
+    }
 
-        // Check if the referenced entity exists
-        if (!ecs_is_valid(it->world, gui->id)) {
-            // Disable GUI if entity doesn’t exist
-            continue;
+    Transform3D *transform = ecs_get_mut(it->world, gui->id, Transform3D);
+    if (transform) {
+        // Store original values to initialize sliders
+        float posX = transform->position.x;
+        float posY = transform->position.y;
+        float posZ = transform->position.z;
+        Vector3 euler = QuaternionToEuler(transform->rotation);
+        float rotX = RAD2DEG * euler.x;
+        float rotY = RAD2DEG * euler.y;
+        float rotZ = RAD2DEG * euler.z;
+        float scaleX = transform->scale.x;
+        float scaleY = transform->scale.y;
+        float scaleZ = transform->scale.z;
+
+        // Store slider input values
+        float newPosX = posX;
+        float newPosY = posY;
+        float newPosZ = posZ;
+        float newRotX = rotX;
+        float newRotY = rotY;
+        float newRotZ = rotZ;
+        float newScaleX = scaleX;
+        float newScaleY = scaleY;
+        float newScaleZ = scaleZ;
+
+        // Draw raygui controls for position, rotation, and scale
+        Rectangle panel = {4, 150, 264, 290};  // GUI panel position and size
+        GuiGroupBox(panel, "Transform Controls");
+
+        // Position controls
+        GuiLabel((Rectangle){20, 170, 100, 20}, "Position");
+        GuiSlider((Rectangle){20, 190, 220, 20}, "X", TextFormat("%.2f", posX), &newPosX, -10.0f, 10.0f);
+        GuiSlider((Rectangle){20, 210, 220, 20}, "Y", TextFormat("%.2f", posY), &newPosY, -10.0f, 10.0f);
+        GuiSlider((Rectangle){20, 230, 220, 20}, "Z", TextFormat("%.2f", posZ), &newPosZ, -10.0f, 10.0f);
+
+        // Rotation controls (display Euler angles, apply incremental quaternions)
+        GuiLabel((Rectangle){20, 260, 100, 20}, "Rotation (degrees)");
+        GuiSlider((Rectangle){20, 280, 220, 20}, "X", TextFormat("%.2f", rotX), &newRotX, -180.0f, 180.0f);
+        GuiSlider((Rectangle){20, 300, 220, 20}, "Y", TextFormat("%.2f", rotY), &newRotY, -180.0f, 180.0f);
+        GuiSlider((Rectangle){20, 320, 220, 20}, "Z", TextFormat("%.2f", rotZ), &newRotZ, -180.0f, 180.0f);
+
+        // Scale controls
+        GuiLabel((Rectangle){20, 350, 100, 20}, "Scale");
+        GuiSlider((Rectangle){20, 370, 220, 20}, "X", TextFormat("%.2f", scaleX), &newScaleX, 0.1f, 5.0f);
+        GuiSlider((Rectangle){20, 390, 220, 20}, "Y", TextFormat("%.2f", scaleY), &newScaleY, 0.1f, 5.0f);
+        GuiSlider((Rectangle){20, 410, 220, 20}, "Z", TextFormat("%.2f", scaleZ), &newScaleZ, 0.1f, 5.0f);
+
+        // Check if any slider values changed
+        bool changed = false;
+
+        // Update position
+        if (newPosX != posX || newPosY != posY || newPosZ != posZ) {
+            transform->position = (Vector3){newPosX, newPosY, newPosZ};
+            changed = true;
         }
 
-        Transform3D *transform = ecs_get_mut(it->world, gui->id, Transform3D);
-        if (transform) {
-            // Store original values to initialize sliders
-            float posX = transform->position.x;
-            float posY = transform->position.y;
-            float posZ = transform->position.z;
-            Vector3 euler = QuaternionToEuler(transform->rotation);
-            float rotX = RAD2DEG * euler.x;
-            float rotY = RAD2DEG * euler.y;
-            float rotZ = RAD2DEG * euler.z;
-            float scaleX = transform->scale.x;
-            float scaleY = transform->scale.y;
-            float scaleZ = transform->scale.z;
+        // Update rotations independently for each axis
+        bool changed_rot_x = fabs(newRotX - rotX) > 0.001f;
+        bool changed_rot_y = fabs(newRotY - rotY) > 0.001f;
+        bool changed_rot_z = fabs(newRotZ - rotZ) > 0.001f;
 
-            // Store slider input values
-            float newPosX = posX;
-            float newPosY = posY;
-            float newPosZ = posZ;
-            float newRotX = rotX;
-            float newRotY = rotY;
-            float newRotZ = rotZ;
-            float newScaleX = scaleX;
-            float newScaleY = scaleY;
-            float newScaleZ = scaleZ;
+        // Only one rotation axis can update at a time
+        if (newRotX != rotX) {
+            float deltaRotX = DEG2RAD * (newRotX - rotX);
+            Quaternion rotXQuat = QuaternionFromAxisAngle((Vector3){1, 0, 0}, deltaRotX);
+            transform->rotation = QuaternionMultiply(transform->rotation, rotXQuat);
+            // changed = true;
+            transform->isDirty = true;
+            printf("X rotation updated: delta=%.2f degrees\n", newRotX - rotX);
+        }
+        if (newRotY != rotY) {
+            float deltaRotY = DEG2RAD * (newRotY - rotY);
+            // float deltaRotY = DEG2RAD * newRotY;
+            Quaternion rotYQuat = QuaternionFromAxisAngle((Vector3){0, 1, 0}, deltaRotY);
+            transform->rotation = QuaternionMultiply(transform->rotation, rotYQuat);
+            // changed = true;
+            transform->isDirty = true;
+            printf("Y rotation updated: delta=%.2f degrees\n", newRotY - rotY);
+        }
+        if (newRotZ != rotZ) {
+            float deltaRotZ = DEG2RAD * (newRotZ - rotZ);
+            Quaternion rotZQuat = QuaternionFromAxisAngle((Vector3){0, 0, 1}, deltaRotZ);
+            transform->rotation = QuaternionMultiply(transform->rotation, rotZQuat);
+            // changed = true;
+            transform->isDirty = true;
+            printf("Z rotation updated: delta=%.2f degrees\n", newRotZ - rotZ);
+        }
 
-            // Draw raygui controls for position, rotation, and scale
-            Rectangle panel = {4, 150, 264, 290};  // GUI panel position and size
-            GuiGroupBox(panel, "Transform Controls");
+        // Update scale
+        if (newScaleX != scaleX || newScaleY != scaleY || newScaleZ != scaleZ) {
+            transform->scale = (Vector3){newScaleX, newScaleY, newScaleZ};
+            changed = true;
+        }
 
-            // Position controls
-            GuiLabel((Rectangle){20, 170, 100, 20}, "Position");
-            GuiSlider((Rectangle){20, 190, 220, 20}, "X", TextFormat("%.2f", posX), &newPosX, -10.0f, 10.0f);
-            GuiSlider((Rectangle){20, 210, 220, 20}, "Y", TextFormat("%.2f", posY), &newPosY, -10.0f, 10.0f);
-            GuiSlider((Rectangle){20, 230, 220, 20}, "Z", TextFormat("%.2f", posZ), &newPosZ, -10.0f, 10.0f);
+        // Apply changes if any slider was modified
+        if (changed) {
+            transform->isDirty = true;
+            // ecs_modified_id(it->world, gui->id, ecs_id(Transform3D));
 
-            // Rotation controls (display Euler angles, apply incremental quaternions)
-            GuiLabel((Rectangle){20, 260, 100, 20}, "Rotation (degrees)");
-            GuiSlider((Rectangle){20, 280, 220, 20}, "X", TextFormat("%.2f", rotX), &newRotX, -180.0f, 180.0f);
-            GuiSlider((Rectangle){20, 300, 220, 20}, "Y", TextFormat("%.2f", rotY), &newRotY, -180.0f, 180.0f);
-            GuiSlider((Rectangle){20, 320, 220, 20}, "Z", TextFormat("%.2f", rotZ), &newRotZ, -180.0f, 180.0f);
-
-            // Scale controls
-            GuiLabel((Rectangle){20, 350, 100, 20}, "Scale");
-            GuiSlider((Rectangle){20, 370, 220, 20}, "X", TextFormat("%.2f", scaleX), &newScaleX, 0.1f, 5.0f);
-            GuiSlider((Rectangle){20, 390, 220, 20}, "Y", TextFormat("%.2f", scaleY), &newScaleY, 0.1f, 5.0f);
-            GuiSlider((Rectangle){20, 410, 220, 20}, "Z", TextFormat("%.2f", scaleZ), &newScaleZ, 0.1f, 5.0f);
-
-            // Check if any slider values changed
-            bool changed = false;
-
-            // Update position
-            if (newPosX != posX || newPosY != posY || newPosZ != posZ) {
-                transform->position = (Vector3){newPosX, newPosY, newPosZ};
-                changed = true;
-            }
-
-            // Update rotations independently for each axis
-            bool changed_rot_x = fabs(newRotX - rotX) > 0.001f;
-            bool changed_rot_y = fabs(newRotY - rotY) > 0.001f;
-            bool changed_rot_z = fabs(newRotZ - rotZ) > 0.001f;
-
-            // Only one rotation axis can update at a time
-            if (newRotX != rotX) {
-                float deltaRotX = DEG2RAD * (newRotX - rotX);
-                Quaternion rotXQuat = QuaternionFromAxisAngle((Vector3){1, 0, 0}, deltaRotX);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotXQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("X rotation updated: delta=%.2f degrees\n", newRotX - rotX);
-            }
-            if (newRotY != rotY) {
-                float deltaRotY = DEG2RAD * (newRotY - rotY);
-                // float deltaRotY = DEG2RAD * newRotY;
-                Quaternion rotYQuat = QuaternionFromAxisAngle((Vector3){0, 1, 0}, deltaRotY);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotYQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("Y rotation updated: delta=%.2f degrees\n", newRotY - rotY);
-            }
-            if (newRotZ != rotZ) {
-                float deltaRotZ = DEG2RAD * (newRotZ - rotZ);
-                Quaternion rotZQuat = QuaternionFromAxisAngle((Vector3){0, 0, 1}, deltaRotZ);
-                transform->rotation = QuaternionMultiply(transform->rotation, rotZQuat);
-                // changed = true;
-                transform->isDirty = true;
-                printf("Z rotation updated: delta=%.2f degrees\n", newRotZ - rotZ);
-            }
-
-            // Update scale
-            if (newScaleX != scaleX || newScaleY != scaleY || newScaleZ != scaleZ) {
-                transform->scale = (Vector3){newScaleX, newScaleY, newScaleZ};
-                changed = true;
-            }
-
-            // Apply changes if any slider was modified
-            if (changed) {
-                transform->isDirty = true;
-                // ecs_modified_id(it->world, gui->id, ecs_id(Transform3D));
-
-                // Debug output to confirm changes
-                printf("GUI updated %s: Pos (%.2f, %.2f, %.2f), Rot (%.2f, %.2f, %.2f), Scale (%.2f, %.2f, %.2f)\n",
-                       ecs_get_name(it->world, gui->id) ? ecs_get_name(it->world, gui->id) : "(unnamed)",
-                       transform->position.x, transform->position.y, transform->position.z,
-                       newRotX, newRotY, newRotZ,
-                       transform->scale.x, transform->scale.y, transform->scale.z);
-            }
+            // Debug output to confirm changes
+            printf("GUI updated %s: Pos (%.2f, %.2f, %.2f), Rot (%.2f, %.2f, %.2f), Scale (%.2f, %.2f, %.2f)\n",
+                    ecs_get_name(it->world, gui->id) ? ecs_get_name(it->world, gui->id) : "(unnamed)",
+                    transform->position.x, transform->position.y, transform->position.z,
+                    newRotX, newRotY, newRotZ,
+                    transform->scale.x, transform->scale.y, transform->scale.z);
         }
     }
 }
 
-// System to process specific child entities (e.g., triggered by GUI)
-void UpdateChildOnly_gui_System(ecs_iter_t *it) {
-    TransformGUI *guis = ecs_field(it, TransformGUI, 0);
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t entity = guis[i].id;
-        if (ecs_is_valid(it->world, entity) && ecs_has(it->world, entity, Transform3D)) {
-            UpdateChildTransformOnly(it->world, entity);
-        }
-    }
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
 }
 
+// main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -355,7 +357,7 @@ int main(void) {
     module_init_dev(world);
 
     ECS_COMPONENT_DEFINE(world, player_input_transform_3d_t);
-    ECS_COMPONENT_DEFINE(world, TransformGUI);
+    ECS_COMPONENT_DEFINE(world, transform_3d_gui_t);
 
     // setup Camera 3D
     Camera3D camera = {
@@ -372,14 +374,20 @@ int main(void) {
     // setup Input
     ecs_singleton_set(world, player_input_transform_3d_t, {
       .isMovementMode=true,
-      .tabPressed=false
+      .tabPressed=false,
+      .moveForward=false,
+      .moveBackward=false,
+      .moveLeft=false,
+      .moveRight=false
     });
 
     // INPUT Current Entity transform3d
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "user_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
         .query.terms = {
-            { .id = ecs_id(Transform3D), .src.id = EcsSelf },
+            { .id = ecs_id(player_input_transform_3d_t), .src.id = ecs_id(player_input_transform_3d_t)  }, // Singleton source
+            { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  }, // Singleton source
+            { .id = ecs_id(Transform3D), .src.id = EcsSelf }
         },
         .callback = user_input_system
     });
@@ -393,10 +401,24 @@ int main(void) {
       .callback = render2d_hud_system
     });
 
-    ECS_SYSTEM(world, GUI_Transform3D_System, RLRender2D1Phase, TransformGUI);
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
-    // Register GUI list system in the 2D rendering phase
-    ECS_SYSTEM(world, GUI_Transform3D_List_System, RLRender2D1Phase, TransformGUI);
+    // transform 3d controls
+    ecs_system(world, {
+      .entity = ecs_entity(world, { .name = "transform_3D_gui_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+      .query.terms = {
+        { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  } // Singleton source
+      },
+      .callback = transform_3D_gui_system
+    });
+
+    ecs_system(world, {
+      .entity = ecs_entity(world, { .name = "transform_3D_gui_list_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+      .query.terms = {
+          { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  } // Singleton source
+      },
+      .callback = transform_3D_gui_list_system
+    });
 
     // create Model
     Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
@@ -461,9 +483,13 @@ int main(void) {
     });
     ecs_set(world, node4, ModelComponent, {&cube});
 
-    ecs_entity_t gui = ecs_new(world);
-    ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
-    ecs_set(world, gui, TransformGUI, {
+    // ecs_entity_t gui = ecs_new(world);
+    // ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
+    // ecs_set(world, gui, transform_3d_gui_t, {
+    //     .id = node1  // Reference the id entity
+    // });
+
+    ecs_singleton_set(world, transform_3d_gui_t, {
         .id = node1  // Reference the id entity
     });
 

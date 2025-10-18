@@ -346,7 +346,9 @@ if(${EXPORT_FLECS_APP})
         # src/main_editor_test.c
         # src/main_enet_test.c
         # src/main_ode_test.c
-        src/main_transform_3d_hierarchy_test.c
+        # src/main_transform_3d_hierarchy_test.c
+        # src/main_transform_3d_hierarchy_test01.c
+        src/main_transform_3d_hierarchy_test02.c
         # src/main.c
     )
 
