@@ -42,7 +42,6 @@ target_link_options(ODE PRIVATE
     -static                                         # Avoid full static linking to prevent issues with system libraries
 )
 
-
 # ODE (Open Dynamics Engine) - Add first to avoid uninstall target conflict
 # CPMAddPackage(
 #     NAME ode
@@ -259,14 +258,13 @@ if(${EXPORT_APP})
         # examples/rl_flecs_test02.c
         # examples/raylib3d_flecs_transform_hierarchy07_gui.c
         # examples/raylib3d_flecs_transform_hierarchy08_gui.c
-        examples/raylib3d_flecs_transform_hierarchy09_gui.c # clean up to simple.
+        # examples/raylib3d_flecs_transform_hierarchy09_gui.c # clean up to simple.
         # examples/raylib3d_flecs_transform_hierarchy07.c
         # examples/raylib3d_flecs_transform_hierarchy08.c
         # examples/raylib3d_flecs_transform_hierarchy10.c
         # examples/raylib3d_flecs_transform_hierarchy11.c
         # examples/rl_flecs_camera3d.c 
-        # examples/raylib_raycast_picking01.c 
-        
+        examples/raylib_raycast_picking01.c 
         # src/example_raygui.c
         # src/example_flecs.c
         # src/raylib_flecs.c
@@ -339,16 +337,17 @@ if(${EXPORT_FLECS_APP})
         ${SRC_FLECS_MODULES}
         # src/main_camera_capsule.c
         # src/main_raylib_shape_wires.c
-        # src/main_ode_gui_test.c
         # src/main_camera_picking.c
         # src/main_camera_test01.c
         # src/main_camera_test02.c
         # src/main_editor_test.c
         # src/main_enet_test.c
+        # src/main_ode_gui_test.c
         # src/main_ode_test.c
+        src/main_ode_controller_test.c
         # src/main_transform_3d_hierarchy_test.c
         # src/main_transform_3d_hierarchy_test01.c
-        src/main_transform_3d_hierarchy_test02.c
+        # src/main_transform_3d_hierarchy_test02.c
         # src/main.c
     )
 
@@ -482,12 +481,13 @@ if(${EXPORT_ENET_APP})
     endif()
 endif()
 
-set(EXPORT_ODE_APP OFF)
+set(EXPORT_ODE_APP ON)
 # set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_ODE_APP})
     set(APP_ODE_NAME rl_flecs_ode)
     add_executable(${APP_ODE_NAME}
-        examples/c/raylib_flecs_ode_gui03.c
+        # examples/c/raylib_flecs_ode_gui03.c
+        examples/c/raylib_flecs_ode_controller.c
     )
     # Link application with custom_cimgui
     target_link_libraries(${APP_ODE_NAME} PRIVATE 

@@ -196,6 +196,10 @@ void camera_input_system(ecs_iter_t *it){
     // }
 }
 
+void render_2d_info_system(ecs_iter_t *it){
+    DrawText("R Key to reset Cube.", 0, 30, 20, BLACK );
+}
+
 // main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
@@ -218,6 +222,7 @@ int main(void) {
     module_init_ode(world);
 
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
+    ECS_SYSTEM(world, render_2d_info_system, RLRender2D1Phase);
 
     // Create an entity observer
     ecs_observer(world, {
@@ -326,3 +331,4 @@ int main(void) {
     CloseWindow();
     return 0;
 }
+

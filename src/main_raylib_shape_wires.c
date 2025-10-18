@@ -67,7 +67,6 @@ typedef struct {
 } cylinder_wire_t;
 ECS_COMPONENT_DECLARE(cylinder_wire_t);
 
-
 // draw raylib grid
 void render_3d_grid(ecs_iter_t *it){
     DrawGrid(10, 1.0f);
@@ -216,7 +215,6 @@ void render_3d_draw_cylinder_wires(ecs_iter_t *it){
     }
 }
 
-
 // picking raycast
 void cube_wires_picking_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
@@ -249,7 +247,7 @@ void render_2d_draw_cross_point(ecs_iter_t *it){
     DrawCircleLines((int)(WINDOW_WIDTH/2), (int)(WINDOW_HEIGHT/2), 8, DARKBLUE);
 }
 
-// 
+// main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
@@ -268,15 +266,6 @@ int main(void) {
 
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
-    // Create observer that is invoked whenever Position is set
-    // ecs_observer(world, {
-    //     .query.terms = {{ ecs_id(Transform3D) }},
-    //     .events = { EcsOnAdd },
-    //     .callback = on_add_entity
-    // });
-
-    // does not work incorrect config
-    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t, camera_controller_t);
     // Input for camera
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "network_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
@@ -314,7 +303,6 @@ int main(void) {
         .callback = render_3d_draw_sphere_wires
     });
 
-
     // Render 3D Cylinder
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "render_3d_draw_cylinder_wires", .add = ecs_ids(ecs_dependson(RLRender3DPhase)) }),
@@ -323,7 +311,6 @@ int main(void) {
         },
         .callback = render_3d_draw_cylinder_wires
     });
-
 
     // picking raycast system
     ecs_system(world, {
@@ -340,7 +327,6 @@ int main(void) {
         .entity = ecs_entity(world, { .name = "render_2d_draw_cross_point", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
         .callback = render_2d_draw_cross_point
     });
-
 
     // setup Camera 3D
     Camera3D camera = {
@@ -359,7 +345,6 @@ int main(void) {
         .pitch = -0.592f,
     });
     
-
     ecs_entity_t cube_wired_1 = ecs_entity(world, {
       .name = "CubeWire1"
     });
@@ -371,7 +356,6 @@ int main(void) {
         .color = BLUE
     });
 
-
     ecs_entity_t cube_wired_2 = ecs_entity(world, {
       .name = "CubeWire2"
     });
@@ -382,7 +366,6 @@ int main(void) {
         .length = 1.0f,
         .color = RED
     });
-
 
     ecs_entity_t capsule_wired_1 = ecs_entity(world, {
       .name = "Capsule"
@@ -397,7 +380,6 @@ int main(void) {
         .rings = 8,
         .color = BLACK
     });
-
 
     ecs_entity_t sphere_wired_1 = ecs_entity(world, {
       .name = "Sphere1"
@@ -421,7 +403,6 @@ int main(void) {
         .slices = 8,
         .color = ORANGE
     });
-
 
     //Loop Logic and render
     while (!WindowShouldClose()) {

@@ -26,6 +26,7 @@ typedef struct {
 } transform_3d_gui_t;
 ECS_COMPONENT_DECLARE(transform_3d_gui_t);
 
+// select transform id to move cube
 void user_input_system(ecs_iter_t *it) {
     // player_input_transform_3d_t *pi_ctx = ecs_singleton_ensure(it->world, player_input_transform_3d_t);
     // if (!pi_ctx) return;
@@ -107,6 +108,7 @@ void user_input_system(ecs_iter_t *it) {
     }
 }
 
+// display info
 void render2d_hud_system(ecs_iter_t *it){
   player_input_transform_3d_t *pi_ctx = ecs_singleton_ensure(it->world, player_input_transform_3d_t);
   if (!pi_ctx) return;
@@ -124,6 +126,7 @@ void render2d_hud_system(ecs_iter_t *it){
   DrawFPS(10, 70);
 }
 
+// display transform 3d list
 void transform_3D_gui_list_system(ecs_iter_t *it) {
     // transform_3d_gui_t *guis = ecs_field(it, transform_3d_gui_t, 0);
     transform_3d_gui_t *gui = ecs_field(it, transform_3d_gui_t, 0);
@@ -359,27 +362,7 @@ int main(void) {
     ECS_COMPONENT_DEFINE(world, player_input_transform_3d_t);
     ECS_COMPONENT_DEFINE(world, transform_3d_gui_t);
 
-    // setup Camera 3D
-    Camera3D camera = {
-        .position = (Vector3){10.0f, 10.0f, 10.0f},
-        .target = (Vector3){0.0f, 0.0f, 0.0f},
-        .up = (Vector3){0.0f, 1.0f, 0.0f},
-        .fovy = 45.0f,
-        .projection = CAMERA_PERSPECTIVE
-    };
-    ecs_singleton_set(world, main_context_t, {
-        .camera = camera
-    });
-
-    // setup Input
-    ecs_singleton_set(world, player_input_transform_3d_t, {
-      .isMovementMode=true,
-      .tabPressed=false,
-      .moveForward=false,
-      .moveBackward=false,
-      .moveLeft=false,
-      .moveRight=false
-    });
+    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
     // INPUT Current Entity transform3d
     ecs_system(world, {
@@ -401,8 +384,6 @@ int main(void) {
       .callback = render2d_hud_system
     });
 
-    ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
-
     // transform 3d controls
     ecs_system(world, {
       .entity = ecs_entity(world, { .name = "transform_3D_gui_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
@@ -412,12 +393,35 @@ int main(void) {
       .callback = transform_3D_gui_system
     });
 
+    // transform 3d list
     ecs_system(world, {
       .entity = ecs_entity(world, { .name = "transform_3D_gui_list_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
       .query.terms = {
           { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  } // Singleton source
       },
       .callback = transform_3D_gui_list_system
+    });
+
+    // setup Camera 3D
+    Camera3D camera = {
+        .position = (Vector3){10.0f, 10.0f, 10.0f},
+        .target = (Vector3){0.0f, 0.0f, 0.0f},
+        .up = (Vector3){0.0f, 1.0f, 0.0f},
+        .fovy = 45.0f,
+        .projection = CAMERA_PERSPECTIVE
+    };
+    ecs_singleton_set(world, main_context_t, {
+        .camera = camera
+    });
+
+    // setup Input
+    ecs_singleton_set(world, player_input_transform_3d_t, {
+      .isMovementMode=true,
+      .tabPressed=false,
+      .moveForward=false,
+      .moveBackward=false,
+      .moveLeft=false,
+      .moveRight=false
     });
 
     // create Model
@@ -483,12 +487,7 @@ int main(void) {
     });
     ecs_set(world, node4, ModelComponent, {&cube});
 
-    // ecs_entity_t gui = ecs_new(world);
-    // ecs_set_name(world, gui, "transform_gui");  // Optional: Name for debugging
-    // ecs_set(world, gui, transform_3d_gui_t, {
-    //     .id = node1  // Reference the id entity
-    // });
-
+    // set select entity id
     ecs_singleton_set(world, transform_3d_gui_t, {
         .id = node1  // Reference the id entity
     });
