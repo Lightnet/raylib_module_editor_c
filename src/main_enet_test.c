@@ -42,10 +42,7 @@ int main(void) {
     module_init_enet(world);
 
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
-
-
     ECS_SYSTEM(world, render_2d_network, RLRender2D1Phase);
-
 
     // setup Camera 3D
     Camera3D camera = {

@@ -2,7 +2,7 @@
 #include "ecs_components.h"
 #include "module_libevent.h"
 #include <string.h>
-
+#include <stdlib.h>
 
 // Define global constants and storage for connected clients
 #define MAX_CLIENTS 10
@@ -18,6 +18,9 @@ ECS_COMPONENT_DECLARE(libevent_server_t);
 ECS_COMPONENT_DECLARE(libevent_client_t);
 ECS_COMPONENT_DECLARE(libevent_context_t);
 ECS_COMPONENT_DECLARE(libevent_bev_t);
+ECS_COMPONENT_DECLARE(libevent_packet_t);
+
+ecs_entity_t libevent_receive_packed;
 
 //===============================================
 // CALLBACKS
@@ -40,8 +43,127 @@ void server_read_cb(struct bufferevent *bev, void *ctx) {
         printf("[server] unknown\n");
         snprintf(app->status, sizeof(app->status), "Server: Unknown message: %s", buf);
     }
+    //ecs_singleton_modified(app->world, libevent_context_t);
+    // Emit the received data as an ECS event
+    if (app->world) {
+        // Create a libevent_packet_t instance
+        libevent_packet_t packet = {
+            .data = strdup(buf), // Dynamically allocate a copy of buf
+            .bev = bev
+        };
+        if (packet.data) { // Check if strdup succeeded
+            ecs_emit(app->world, &(ecs_event_desc_t) {
+                .event = ecs_id(libevent_packet_t),
+                .entity = libevent_receive_packed,
+                .param = &packet
+            });
+        } else {
+            printf("[server] Failed to allocate memory for packet data\n");
+        }
+    }
+}
+
+/*
+void server_read_cb(struct bufferevent *bev, void *ctx) {
+    libevent_context_t *app = (libevent_context_t *)ctx;
+    struct evbuffer *input = bufferevent_get_input(bev);
+    size_t len = evbuffer_get_length(input); // Get available data size
+
+    if (len < sizeof(uint16_t) * 2) {
+        // Not enough data for header (type + length)
+        return;
+    }
+
+    // Peek at the header to get the message length
+    struct GameMessage header;
+    if (evbuffer_copyout(input, &header, sizeof(header)) != sizeof(header)) {
+        printf("[server] Failed to read header\n");
+        return;
+    }
+    header.type = ntohs(header.type); // Convert to host byte order
+    header.length = ntohs(header.length);
+
+    // Ensure enough data is available for the full message
+    if (len < sizeof(header) + header.length) {
+        return; // Wait for more data
+    }
+
+    // Allocate buffer for the full message (header + payload)
+    char *buf = malloc(sizeof(header) + header.length);
+    if (!buf) {
+        printf("[server] Failed to allocate memory\n");
+        snprintf(app->status, sizeof(app->status), "Server: Memory allocation failed");
+        ecs_singleton_modified(app->world, libevent_context_t);
+        return;
+    }
+
+    // Copy the full message
+    size_t n = evbuffer_copyout(input, buf, sizeof(header) + header.length);
+    if (n != sizeof(header) + header.length) {
+        free(buf);
+        printf("[server] Failed to copy full message\n");
+        return;
+    }
+
+    // Drain the processed data
+    evbuffer_drain(input, n);
+
+    // Process legacy PING/PONG for compatibility
+    if (header.type == 0 && header.length == 4 && strncmp(buf + sizeof(header), "PING", 4) == 0) {
+        bufferevent_write(bev, "PONG", 4);
+        snprintf(app->status, sizeof(app->status), "Server: Received PING, sent PONG");
+        printf("[server] ping\n");
+    } else if (header.type == 0 && header.length == 4 && strncmp(buf + sizeof(header), "PONG", 4) == 0) {
+        app->pongs_received++;
+        snprintf(app->status, sizeof(app->status), "Server: Received PONG (%d)", app->pongs_received);
+        printf("[server] pong\n");
+    } else {
+        // Process game object data based on type
+        switch (header.type) {
+            case 1: // Position update
+                if (header.length == sizeof(float) * 3) {
+                    float *pos = (float *)(buf + sizeof(header));
+                    printf("[server] Position update: x=%.2f, y=%.2f, z=%.2f\n", pos[0], pos[1], pos[2]);
+                    snprintf(app->status, sizeof(app->status), "Server: Received position update");
+                }
+                break;
+            case 2: // Health update
+                if (header.length == sizeof(int32_t)) {
+                    int32_t *health = (int32_t *)(buf + sizeof(header));
+                    printf("[server] Health update: %d\n", ntohl(*health));
+                    snprintf(app->status, sizeof(app->status), "Server: Received health update");
+                }
+                break;
+            default:
+                printf("[server] Unknown message type: %d\n", header.type);
+                snprintf(app->status, sizeof(app->status), "Server: Unknown message type: %d", header.type);
+        }
+    }
+
+    // Emit ECS event
+    if (app->world) {
+        libevent_packet_t packet = {
+            .data = buf, // Pass ownership to packet
+            .length = n,
+            .bev = bev
+        };
+        ecs_emit(app->world, &(ecs_event_desc_t) {
+            .event = ecs_id(libevent_packet_t),
+            .entity = libevent_receive_packed,
+            .param = &packet
+        });
+    } else {
+        free(buf);
+    }
+
     ecs_singleton_modified(app->world, libevent_context_t);
 }
+*/
+
+
+
+
+
 
 // Server: Handle client errors or disconnection
 void server_error_cb(struct bufferevent *bev, short events, void *ctx) {
@@ -329,6 +451,35 @@ void on_setup_client(ecs_iter_t *it) {
     printf("client set up finished.");
 }
 
+
+// enet packet for string data
+void on_receive_libevent_packed(ecs_iter_t *it) {
+    printf("event on_receive_libevent_packed\n");
+    libevent_packet_t *p = it->param;
+    if (p && p->data) {
+        char *str = (char*)p->data;
+        printf("Received string: %s\n", str);
+        free(str); // Free the dynamically allocated string
+    } else {
+        printf("No valid string data received\n");
+    }
+}
+
+// enet packet for string data
+// nope it crashed if over lap
+// void on_receive_libevent_packed2(ecs_iter_t *it) {
+//     printf("event on_receive_libevent_packed2\n");
+//     libevent_packet_t *p = it->param;
+//     if (p && p->data) {
+//         char *str = (char*)p->data;
+//         printf("Received string: %s\n", str);
+//         free(str); // Free the dynamically allocated string
+//     } else {
+//         printf("No valid string data received\n");
+//     }
+// }
+
+
 // Client cleanup on remove
 void on_remove_client(ecs_iter_t *it) {
     libevent_client_t *libevent_client = ecs_field(it, libevent_client_t, 0);
@@ -396,6 +547,23 @@ void setup_systems_libevent(ecs_world_t *world){
         .events = { EcsOnRemove },
         .callback = on_remove_client
     });
+
+    // Create an entity observer for packed
+    ecs_observer(world, {
+        // Not interested in any specific component
+        .query.terms = {{ EcsAny, .src.id = libevent_receive_packed }},
+        .events = { ecs_id(libevent_packet_t) },
+        .callback = on_receive_libevent_packed
+    });
+
+
+    // ecs_observer(world, {
+    //     // Not interested in any specific component
+    //     .query.terms = {{ EcsAny, .src.id = libevent_receive_packed }},
+    //     .events = { ecs_id(libevent_packet_t) },
+    //     .callback = on_receive_libevent_packed2
+    // });
+
 }
 // components
 void setup_components_libevent(ecs_world_t *world){
@@ -403,7 +571,11 @@ void setup_components_libevent(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, libevent_server_t); 
     ECS_COMPONENT_DEFINE(world, libevent_client_t); 
     ECS_COMPONENT_DEFINE(world, libevent_context_t); 
-    ECS_COMPONENT_DEFINE(world, libevent_bev_t); 
+    ECS_COMPONENT_DEFINE(world, libevent_bev_t);
+    ECS_COMPONENT_DEFINE(world, libevent_packet_t);
+
+    // Define the event entity network type
+    libevent_receive_packed = ecs_entity(world, { .name = "libevent_receive_packed" });
 }
 
 void module_init_libevent(ecs_world_t *world){

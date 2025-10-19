@@ -128,6 +128,18 @@ void render_2d_draw_cross_point(ecs_iter_t *it){
     DrawCircleLines((int)(WINDOW_WIDTH/2), (int)(WINDOW_HEIGHT/2), 8, DARKBLUE);
 }
 
+void send_position_update(struct bufferevent *bev, float x, float y, float z) {
+    struct GameMessage *msg = malloc(sizeof(struct GameMessage) + sizeof(float) * 3);
+    msg->type = htons(1); // Position update
+    msg->length = htons(sizeof(float) * 3);
+    float *pos = (float *)(msg->payload);
+    pos[0] = x;
+    pos[1] = y;
+    pos[2] = z;
+    bufferevent_write(bev, msg, sizeof(struct GameMessage) + sizeof(float) * 3);
+    free(msg);
+}
+
 // draw server and client network
 void render_2d_libevent_system(ecs_iter_t *it){
     const libevent_context_t *app = ecs_singleton_get(it->world, libevent_context_t);
@@ -151,13 +163,16 @@ void render_2d_libevent_system(ecs_iter_t *it){
     }
     if(GuiButton((Rectangle){0,22*2,64,20},"client")){
         printf("client\n");
-        //server setup
-        ecs_singleton_set(it->world, libevent_client_t,{
-            .client_bev = NULL,
-            .address = "127.0.0.1",
-            .port = 8080,
-            .is_init = false,
-        });
+        const libevent_client_t *libevent_client = ecs_singleton_get(it->world, libevent_client_t);
+        if(!libevent_client){
+            //client setup
+            ecs_singleton_set(it->world, libevent_client_t,{
+                .client_bev = NULL,
+                .address = "127.0.0.1",
+                .port = 8080,
+                .is_init = false,
+            });
+        }
     }
 
     if(GuiButton((Rectangle){0,22*3,64,20},"ping")){
@@ -193,12 +208,35 @@ void render_2d_libevent_system(ecs_iter_t *it){
                 // }
             }
             ecs_query_fini(q);
-
             printf("client(s) %d\n", client_nums);
-            
         }
     }
 
+    const libevent_server_t *libevent_server3 = ecs_singleton_get(it->world, libevent_server_t);
+    if(libevent_server3){
+        int client_nums2 = 0;
+        ecs_query_t *q2 = ecs_query(it->world, {
+            .terms = {
+                {  .id = ecs_id(libevent_bev_t) }
+            }
+        });
+        ecs_iter_t qit2 = ecs_query_iter(it->world, q2);
+        while (ecs_query_next(&qit2)) {
+            // libevent_bev_t *libevent_bev = ecs_field(&it, libevent_bev_t, 0);
+            client_nums2 += qit2.count;
+            // for (int i = 0; i < it.count; i++) {
+                // ecs_entity_t client = it.entities[i];
+                // Do the thing
+                // if(bev == libevent_bev[i].bev){
+                //     ecs_delete(app->world, client);
+                //     printf("[server] remove client.\n");
+                // }
+            // }
+        }
+        ecs_query_fini(q2);
+        // printf("client(s) %d\n", client_nums2);
+        DrawText(TextFormat("client(s) %d\n", client_nums2), 70, 22 * 2, 20, DARKGRAY);
+    }
 }
 
 // main

@@ -38,6 +38,7 @@ typedef struct {
 } libevent_client_t;
 extern ECS_COMPONENT_DECLARE(libevent_client_t);
 
+// server client handle
 typedef struct {
     struct bufferevent *bev;
 } libevent_bev_t;
@@ -57,5 +58,24 @@ typedef struct {
     char status[256];
 } libevent_context_t;
 extern ECS_COMPONENT_DECLARE(libevent_context_t);
+
+// libevent packet component
+typedef struct {
+    void *data;       // Pointer to the message data (header + payload)
+    size_t length;    // Total length of the data
+    struct bufferevent *bev; // Source bufferevent
+} libevent_packet_t;
+extern ECS_COMPONENT_DECLARE(libevent_packet_t);
+
+// Declare event entity as extern for global access
+extern ecs_entity_t libevent_receive_packed;
+
+
+struct GameMessage {
+    uint16_t type;    // Message type (e.g., 1 = Position, 2 = Health, 3 = Chat)
+    uint16_t length;  // Length of payload in bytes
+    uint8_t payload[]; // Variable-length payload (flexible array member)
+};
+
 
 void module_init_libevent(ecs_world_t *world); 

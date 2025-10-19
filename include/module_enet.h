@@ -60,7 +60,7 @@ typedef struct tagMSG *LPMSG;
 // #undef CloseWindow
 // #undef ShowCursor
 
-// TransformGUI component
+// enet packet component
 typedef struct {
     void *data;
 } enet_packet_t;
