@@ -350,14 +350,14 @@ int main(void) {
         .callback = on_reset_cube_system
     });
 
-    // Create observer that is invoked whenever Position is set
+    // Create observer that is invoked whenever ode body is add
     ecs_observer(world, {
         .query.terms = {{ ecs_id(ode_box_t) }},
         .events = { EcsOnAdd },
         .callback = on_add_ode_box
     });
 
-    // Create observer that is invoked whenever Position is set
+    // Create observer that is invoked whenever ode body is remove
     ecs_observer(world, {
         .query.terms = {{ ecs_id(ode_box_t) }},
         .events = { EcsOnRemove },

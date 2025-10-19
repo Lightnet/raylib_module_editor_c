@@ -212,6 +212,21 @@ set(CGLM_SHARED OFF CACHE BOOL "" FORCE)
 set(CGLM_STATIC ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cglm)
 
+FetchContent_Declare(
+    libevent
+    GIT_REPOSITORY https://github.com/libevent/libevent.git
+    GIT_TAG release-2.1.12-stable
+    GIT_PROGRESS   TRUE
+)
+set(EVENT__DISABLE_OPENSSL ON)
+set(EVENT__DISABLE_BENCHMARK ON)
+set(EVENT__DISABLE_TESTS ON)
+set(EVENT__DISABLE_REGRESS ON)
+set(EVENT__DISABLE_THREAD_SUPPORT ON)
+set(EVENT__DISABLE_SAMPLES ON)
+
+FetchContent_MakeAvailable(libevent)
+
 # FetchContent_Declare(
 #     stb
 #     GIT_REPOSITORY https://github.com/nothings/stb.git
@@ -327,6 +342,7 @@ if(${EXPORT_FLECS_APP})
         src/module_dev.c
         src/module_enet.c # not there no define...
         src/module_ode.c
+        src/module_libevent.c
         src/raygui_impl.c # define RAYGUI_IMPLEMENTATION
         src/enet_impl.c # define ENET_IMPLEMENTATION
     )
@@ -344,7 +360,8 @@ if(${EXPORT_FLECS_APP})
         # src/main_enet_test.c
         # src/main_ode_gui_test.c
         # src/main_ode_test.c
-        src/main_ode_controller_test.c
+        # src/main_ode_controller_test.c
+        src/main_raylib_libevent_test.c
         # src/main_transform_3d_hierarchy_test.c
         # src/main_transform_3d_hierarchy_test01.c
         # src/main_transform_3d_hierarchy_test02.c
@@ -362,6 +379,8 @@ if(${EXPORT_FLECS_APP})
         flecs                                           # flecs
         cglm                                            # cglm
         ODE                                             # ode must be cap from ode repo cmake config
+        event_shared 
+        # event_core_shared 
     )
     # Include directories for the application
     target_include_directories(${APP_FLECS_NAME1} PUBLIC
@@ -375,6 +394,8 @@ if(${EXPORT_FLECS_APP})
         ${cglm_SOURCE_DIR}/include                          # clgm
         # ${ode_SOURCE_DIR}/include                         # 
         ${ode_BINARY_DIR}/include                           # 
+        ${libevent_SOURCE_DIR}/include                           # 
+        ${libevent_BINARY_DIR}/include                           # event2/event-config.h
     )
     # Windows-specific settings
     if(WIN32)
@@ -394,6 +415,80 @@ if(${EXPORT_FLECS_APP})
         )
     endif()
 endif()
+
+
+
+
+
+set(EXPORT_BE_APP ON)
+# set(EXPORT_FLECS_APP OFF)
+if(${EXPORT_BE_APP})
+
+    message(STATUS "EXPORT LIBEVENT APP")
+    set(APP_LEVENT_NAME rl_lev)
+    add_executable(${APP_LEVENT_NAME}
+        examples/c/raylib_event_base_dispatch.c
+    )
+    target_compile_definitions(${APP_LEVENT_NAME} PRIVATE 
+        # RAYGUI_IMPLEMENTATION=1
+    )
+    # Link application with custom_cimgui
+    target_link_libraries(${APP_LEVENT_NAME} PRIVATE 
+        raylib                                          # raylib
+        # Libevent::core
+        # libevent::core
+        event_shared 
+        event_core_shared 
+        # libevent
+        # lua                                           # lua
+        # flecs                                           # flecs
+        # cglm                                            # cglm
+        # ODE                                             # ode must be cap from ode repo cmake config
+    )
+    # Include directories for the application
+    target_include_directories(${APP_LEVENT_NAME} PUBLIC
+        ${PROJECT_SOURCE_DIR}/include                       # include
+        # ${lua_SOURCE_DIR}                                   # lua
+        ${raylib_SOURCE_DIR}/src                            # raylib include
+        # ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
+        # ${enet_SOURCE_DIR}/include                          # enet
+        # ${stb_SOURCE_DIR}                                 # stb
+        ${raygui_SOURCE_DIR}/src                            # raygui
+        # ${cglm_SOURCE_DIR}/include                          # clgm
+        # ${ode_SOURCE_DIR}/include                         # 
+        # ${ode_BINARY_DIR}/include                           # 
+        ${libevent_SOURCE_DIR}/include                           # 
+        ${libevent_BINARY_DIR}/include                           # event2/event-config.h
+    )
+    # Windows-specific settings
+    if(WIN32)
+        # ws2_32 # network
+        target_link_libraries(${APP_LEVENT_NAME} PRIVATE 
+            ws2_32                                          # Winsock 2
+            gdi32                                           # Graphics Device Interface
+            user32                                          # Windows user interface
+            shell32                                         # Windows 
+            ws2_32                                          # network socket
+        )
+        # target_link_options(${APP_NAME} PRIVATE -static-libgcc)
+        target_link_options(${APP_LEVENT_NAME} PRIVATE
+            -static-libgcc                                  # GNU Compiler Collection
+            -static-libstdc++                               # Uncomment if C++ code is used
+            -static                                         # Avoid full static linking to prevent issues with system libraries
+        )
+    endif()
+endif()
+
+
+
+
+
+
+
+
+
+
+
 
 set(EXPORT_ENET_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
@@ -438,8 +533,6 @@ if(${EXPORT_ENET_APP})
             -static                                         # Avoid full static linking to prevent issues with system libraries
         )
     endif()
-
-
     set(APP_ENET_SERVER_NAME enet_server)
     add_executable(${APP_ENET_SERVER_NAME}
         src/enet_server.c
@@ -480,6 +573,7 @@ if(${EXPORT_ENET_APP})
         )
     endif()
 endif()
+
 
 set(EXPORT_ODE_APP ON)
 # set(EXPORT_FLECS_APP OFF)

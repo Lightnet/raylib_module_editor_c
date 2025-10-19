@@ -207,7 +207,7 @@ void sync_transform_3d_system(ecs_iter_t *it){
 void setup_systems_ode(ecs_world_t *world){
     
     //physics
-    ecs_system_init(world, &(ecs_system_desc_t){
+    ecs_system(world, {
         .entity = ecs_entity(world, { 
             .name = "ode_physics_system", 
             .add = ecs_ids(ecs_dependson(EcsOnUpdate)) 
