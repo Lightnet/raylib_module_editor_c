@@ -17,6 +17,7 @@ ECS_COMPONENT_DECLARE(libevent_base_t);
 ECS_COMPONENT_DECLARE(libevent_server_t);
 ECS_COMPONENT_DECLARE(libevent_client_t);
 ECS_COMPONENT_DECLARE(libevent_context_t);
+ECS_COMPONENT_DECLARE(libevent_bev_t);
 
 //===============================================
 // CALLBACKS
@@ -30,10 +31,13 @@ void server_read_cb(struct bufferevent *bev, void *ctx) {
     if (strcmp(buf, "PING") == 0) {
         bufferevent_write(bev, "PONG", 4);
         snprintf(app->status, sizeof(app->status), "Server: Received PING, sent PONG");
+        printf("[server] ping\n");
     } else if (strcmp(buf, "PONG") == 0) {
         app->pongs_received++;
         snprintf(app->status, sizeof(app->status), "Server: Received PONG (%d)", app->pongs_received);
+        printf("[server] pong\n");
     } else {
+        printf("[server] unknown\n");
         snprintf(app->status, sizeof(app->status), "Server: Unknown message: %s", buf);
     }
     ecs_singleton_modified(app->world, libevent_context_t);
@@ -55,8 +59,30 @@ void server_error_cb(struct bufferevent *bev, short events, void *ctx) {
                 break;
             }
         }
+        // handle remove client
+        if(app->world){
+            ecs_query_t *q = ecs_query(app->world, {
+                .terms = {
+                    {  .id = ecs_id(libevent_bev_t) }
+                }
+            });
+            ecs_iter_t it = ecs_query_iter(app->world, q);
+            while (ecs_query_next(&it)) {
+                libevent_bev_t *libevent_bev = ecs_field(&it, libevent_bev_t, 0);
+                for (int i = 0; i < it.count; i++) {
+                    ecs_entity_t entity_client = it.entities[i];
+                    // Do the thing
+                    if(bev == libevent_bev[i].bev){
+                        ecs_delete(app->world, entity_client);
+                        printf("[server] remove client.\n");
+                    }
+
+                }
+            }
+            ecs_query_fini(q);
+        }
         bufferevent_free(bev);
-        ecs_singleton_modified(app->world, libevent_context_t);
+        // ecs_singleton_modified(app->world, libevent_context_t);
     }
 }
 
@@ -80,8 +106,16 @@ void server_accept_cb(struct evconnlistener *listener, evutil_socket_t fd, struc
     bufferevent_setcb(bev, server_read_cb, NULL, server_error_cb, app);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
     connected_clients[num_clients++] = bev;
+
+    if(app->world){
+        ecs_entity_t e = ecs_new(app->world);
+        ecs_set(app->world, e, libevent_bev_t, {
+            .bev=bev
+        });
+    }
+
     snprintf(app->status, sizeof(app->status), "Server: Client %d connected", num_clients);
-    ecs_singleton_modified(app->world, libevent_context_t);
+    // ecs_singleton_modified(app->world, libevent_context_t);
 }
 
 // Client: Handle server response
@@ -93,11 +127,14 @@ void client_read_cb(struct bufferevent *bev, void *ctx) {
     if (strcmp(buf, "PING") == 0) {
         bufferevent_write(bev, "PONG", 4);
         snprintf(app->status, sizeof(app->status), "Client: Received PING, sent PONG");
+        printf("[client] ping\n");
     } else if (strcmp(buf, "PONG") == 0) {
         app->pongs_received++;
         snprintf(app->status, sizeof(app->status), "Client: Received PONG (%d)", app->pongs_received);
+        printf("[client] pong\n");
     } else {
         snprintf(app->status, sizeof(app->status), "Client: Unknown message: %s", buf);
+        printf("[client] unknown\n");
     }
     ecs_singleton_modified(app->world, libevent_context_t);
 }
@@ -109,7 +146,7 @@ void client_read_cb(struct bufferevent *bev, void *ctx) {
 void event_base_system(ecs_iter_t *it) {
     libevent_base_t *libevent_base = ecs_field(it, libevent_base_t, 0);
     if (!libevent_base || !libevent_base->ev_base) return;
-    printf("libevent_base_t\n");
+    // printf("libevent_base_t\n");
 
     // Process libevent events
     event_base_loop(libevent_base->ev_base, EVLOOP_NONBLOCK);
@@ -215,8 +252,8 @@ void client_error_cb(struct bufferevent *bev, short events, void *ctx) {
 // Client setup on add
 void on_setup_client(ecs_iter_t *it) {
     libevent_context_t *app = ecs_singleton_get_mut(it->world, libevent_context_t);
-    // libevent_client_t *libevent_client = ecs_field(it, libevent_client_t, 0);
-    libevent_client_t *libevent_client = ecs_singleton_get_mut(it->world, libevent_client_t);
+    libevent_client_t *libevent_client = ecs_field(it, libevent_client_t, 0);
+    // libevent_client_t *libevent_client = ecs_singleton_get_mut(it->world, libevent_client_t);
     
     if (!app) {
         ecs_singleton_set(it->world, libevent_context_t, {
@@ -366,6 +403,7 @@ void setup_components_libevent(ecs_world_t *world){
     ECS_COMPONENT_DEFINE(world, libevent_server_t); 
     ECS_COMPONENT_DEFINE(world, libevent_client_t); 
     ECS_COMPONENT_DEFINE(world, libevent_context_t); 
+    ECS_COMPONENT_DEFINE(world, libevent_bev_t); 
 }
 
 void module_init_libevent(ecs_world_t *world){

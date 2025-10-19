@@ -20,7 +20,7 @@
 #include <event2/listener.h>
 #include <stdbool.h>
 
-// TransformGUI component
+// server network component
 typedef struct {
     struct evconnlistener *listener;
     // int port;
@@ -29,14 +29,7 @@ typedef struct {
 } libevent_server_t;
 extern ECS_COMPONENT_DECLARE(libevent_server_t);
 
-// typedef struct {
-//     struct bufferevent *client_bev;
-//     char address[128];
-//     int port;
-//     bool is_init; //prevent overlap set up
-// } libevent_client_t;
-// extern ECS_COMPONENT_DECLARE(libevent_client_t);
-
+// client network component
 typedef struct {
     struct bufferevent *client_bev;
     char address[INET_ADDRSTRLEN]; // Use INET_ADDRSTRLEN for IPv4 addresses
@@ -45,12 +38,18 @@ typedef struct {
 } libevent_client_t;
 extern ECS_COMPONENT_DECLARE(libevent_client_t);
 
+typedef struct {
+    struct bufferevent *bev;
+} libevent_bev_t;
+extern ECS_COMPONENT_DECLARE(libevent_bev_t);// server client
 
+// network loop
 typedef struct {
     struct event_base *ev_base;
 } libevent_base_t;
 extern ECS_COMPONENT_DECLARE(libevent_base_t);
 
+//libevent context
 typedef struct {
     ecs_world_t *world;
     int pings_sent;

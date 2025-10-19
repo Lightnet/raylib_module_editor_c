@@ -166,8 +166,39 @@ void render_2d_libevent_system(ecs_iter_t *it){
         if(libevent_client){
             bufferevent_write(libevent_client->client_bev, "PING", 4);
         }
-
     }
+
+    if(GuiButton((Rectangle){0,22*4,64,20},"get clients")){
+        printf("get clients\n");
+        const libevent_server_t *libevent_server2 = ecs_singleton_get(it->world, libevent_server_t);
+
+        if(libevent_server2){
+            int client_nums = 0;
+            ecs_query_t *q = ecs_query(it->world, {
+                .terms = {
+                    {  .id = ecs_id(libevent_bev_t) }
+                }
+            });
+            ecs_iter_t qit = ecs_query_iter(it->world, q);
+            while (ecs_query_next(&qit)) {
+                // libevent_bev_t *libevent_bev = ecs_field(&it, libevent_bev_t, 0);
+                client_nums += qit.count;
+                // for (int i = 0; i < it.count; i++) {
+                    // ecs_entity_t client = it.entities[i];
+                    // Do the thing
+                    // if(bev == libevent_bev[i].bev){
+                    //     ecs_delete(app->world, client);
+                    //     printf("[server] remove client.\n");
+                    // }
+                // }
+            }
+            ecs_query_fini(q);
+
+            printf("client(s) %d\n", client_nums);
+            
+        }
+    }
+
 }
 
 // main
