@@ -227,15 +227,15 @@ set(EVENT__DISABLE_SAMPLES ON)
 
 FetchContent_MakeAvailable(libevent)
 
-# FetchContent_Declare(
-#     stb
-#     GIT_REPOSITORY https://github.com/nothings/stb.git
-#     GIT_TAG        master
-#     EXCLUDE_FROM_ALL #this disable build?
-#     GIT_SHALLOW TRUE
-#     USES_TERMINAL_DOWNLOAD TRUE
-# )
-# FetchContent_MakeAvailable(stb)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG        master
+    EXCLUDE_FROM_ALL #this disable build?
+    GIT_SHALLOW TRUE
+    USES_TERMINAL_DOWNLOAD TRUE
+)
+FetchContent_MakeAvailable(stb)
 
 
 # Now add your target, and optionally a unified uninstall
@@ -265,6 +265,10 @@ if(${EXPORT_APP})
         icon.rc
         # ${SRC_FILES}
         # src/main.c
+        # src/example_raygui.c
+        # src/example_flecs.c
+        # src/raylib_flecs.c
+        # src/raylib_raycast.c
         # examples/flecs_id.c
         # examples/example_window.c
         # examples/rl_flecs_test01.c
@@ -280,11 +284,9 @@ if(${EXPORT_APP})
         # examples/raylib3d_flecs_transform_hierarchy11.c
         # examples/rl_flecs_camera3d.c 
         # examples/raylib_raycast_picking01.c 
-        examples/c/raylib_atlas_texture.c 
-        # src/example_raygui.c
-        # src/example_flecs.c
-        # src/raylib_flecs.c
-        # src/raylib_raycast.c
+        # examples/c/raylib_atlas_texture.c 
+        # examples/c/raylib_noise_texture.c 
+        examples/c/raylib_flecs_models.c 
     )
 
     # Link application with custom_cimgui
@@ -305,7 +307,7 @@ if(${EXPORT_APP})
         ${raylib_SOURCE_DIR}/src                            # raylib include
         ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
         # ${enet_SOURCE_DIR}/include                        # enet
-        # ${stb_SOURCE_DIR}                                 # stb
+        ${stb_SOURCE_DIR}                                 # stb
         ${raygui_SOURCE_DIR}/src                            # raygui
         ${cglm_SOURCE_DIR}/include                          # clgm
     )

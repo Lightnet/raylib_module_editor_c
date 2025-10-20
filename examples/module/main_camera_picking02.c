@@ -30,7 +30,6 @@ typedef struct {
 } select_transform_3d_t;
 ECS_COMPONENT_DECLARE(select_transform_3d_t);
 
-
 typedef struct {
     Ray ray;
     RayCollision collision;

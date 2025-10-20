@@ -46,6 +46,14 @@ typedef struct {
 } cube_wire_t;
 ECS_COMPONENT_DECLARE(cube_wire_t);
 
+typedef struct {
+    Model *grass;
+    Model *dirt;
+    Model *stone;
+    Model *rock;
+} blocks_t;
+ECS_COMPONENT_DECLARE(blocks_t);
+
 // camera input
 void camera_input_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
@@ -256,6 +264,7 @@ int main(void) {
 
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
+    // camera input
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "camera_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
         .query.terms = {
@@ -330,6 +339,12 @@ int main(void) {
         .ray = {0},
         .collision = {0}
     });
+
+
+
+
+
+
 
     // setup Input
     // ecs_singleton_set(world, PlayerInput_T, {

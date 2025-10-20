@@ -161,10 +161,6 @@ void server_read_cb(struct bufferevent *bev, void *ctx) {
 */
 
 
-
-
-
-
 // Server: Handle client errors or disconnection
 void server_error_cb(struct bufferevent *bev, short events, void *ctx) {
     libevent_context_t *app = (libevent_context_t *)ctx;
@@ -328,7 +324,6 @@ void on_add_setup_server(ecs_iter_t *it) {
     // ecs_singleton_modified(it->world, libevent_context_t);
 }
 
-
 // Server cleanup on remove
 void on_remove_server(ecs_iter_t *it) {
     libevent_server_t *libevent_server = ecs_field(it, libevent_server_t, 0);
@@ -451,7 +446,6 @@ void on_setup_client(ecs_iter_t *it) {
     printf("client set up finished.");
 }
 
-
 // enet packet for string data
 void on_receive_libevent_packed(ecs_iter_t *it) {
     printf("event on_receive_libevent_packed\n");
@@ -478,7 +472,6 @@ void on_receive_libevent_packed(ecs_iter_t *it) {
 //         printf("No valid string data received\n");
 //     }
 // }
-
 
 // Client cleanup on remove
 void on_remove_client(ecs_iter_t *it) {
