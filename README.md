@@ -59,6 +59,10 @@
 # Flecs Samples:
 - [ ] main_editor_test.c
 - [ ] main_gui_test.c
+
+- [x] main_camera_picking.c
+  - simple ray cast detect cube
+- [x] main_camera_test.c
 - [x] main_enet_test.c
   - server tested
     - [x] add clients
@@ -67,12 +71,12 @@
   - client tested
     - [x] sent server to message pack
     - [x] when close it sent disconnect
-- [ ] main_transform_3d_test
+- [ ] main_transform_3d_hierarchy_test.c
 - [x] main_ode_test.c
     - [ ] cube
         - [x] simple 
         - [x] reset
-        - [ ] sync 
+        - [x] sync 
         - [x] render
         - [ ] add 
         - [ ] remove 
@@ -88,6 +92,9 @@
   This required a lot of thinking to make it module style design for raylib and other libraries will be added to make easy or hard to connect correctly. Which it will break api or module design and conflicts as well.
 
   By using the flecs to handle entities and raylib render and other things.
+
+# bugs:
+- sync object with ODE (Open Dynamics Engine) physics 3d.
 
 # Credits:
 - https://www.raylib.com/

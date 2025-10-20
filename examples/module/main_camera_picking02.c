@@ -20,8 +20,22 @@
 typedef struct {
     float yaw;
     float pitch;
+    //bool is_capture;
 } camera_controller_t;
 ECS_COMPONENT_DECLARE(camera_controller_t);
+
+//handle select 3d transform scene
+typedef struct {
+    ecs_entity_t id;
+} select_transform_3d_t;
+ECS_COMPONENT_DECLARE(select_transform_3d_t);
+
+
+typedef struct {
+    Ray ray;
+    RayCollision collision;
+} picking_t;
+ECS_COMPONENT_DECLARE(picking_t);
 
 typedef struct {
     Vector3 position;
@@ -32,21 +46,21 @@ typedef struct {
 } cube_wire_t;
 ECS_COMPONENT_DECLARE(cube_wire_t);
 
-// draw raylib grid
-void render_3d_grid(ecs_iter_t *it){
-    DrawGrid(10, 1.0f);
-}
-
 // camera input
 void camera_input_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
     camera_controller_t *camera_controller = ecs_field(it, camera_controller_t, 1);
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
-    {
+
+    if(IsKeyPressed(KEY_F1)){
         if (IsCursorHidden()) EnableCursor();
         else DisableCursor();
     }
+
+    // if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
+    //     if (IsCursorHidden()) EnableCursor();
+    //     else DisableCursor();
+    // }
 
     if(IsCursorHidden()){
         // printf("...\n");
@@ -142,63 +156,108 @@ void render_3d_draw_cube_wires(ecs_iter_t *it){
 // picking raycast
 void cube_wires_picking_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
-    cube_wire_t *cube_wire = ecs_field(it, cube_wire_t, 1);
+    picking_t *picking = ecs_field(it, picking_t, 1);
+    cube_wire_t *cube_wire = ecs_field(it, cube_wire_t, 2);
 
-    Ray ray = { 0 };                    // Picking line ray
-    RayCollision collision = { 0 };     // Ray collision hit info
+    // Ray ray = { 0 };                    // Picking line ray
+    // RayCollision collision = { 0 };     // Ray collision hit info
 
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+        picking->ray = GetScreenToWorldRay(GetMousePosition(), main_context->camera);
+        // Iterate matched entities
+        for (int i = 0; i < it->count; i++) {
+            DrawCubeWires(cube_wire[i].position, cube_wire[i].width,cube_wire[i].height,cube_wire[i].length, cube_wire[i].color);
+            picking->collision = GetRayCollisionBox(picking->ray,
+                (BoundingBox){(Vector3){ cube_wire[i].position.x - cube_wire[i].width/2, cube_wire[i].position.y - cube_wire[i].height/2, cube_wire[i].position.z - cube_wire[i].length/2 },
+                            (Vector3){ cube_wire[i].position.x + cube_wire[i].width/2, cube_wire[i].position.y + cube_wire[i].height/2, cube_wire[i].position.z + cube_wire[i].length/2 }} );
+            if (picking->collision.hit){
+                cube_wire[i].color = GREEN;
+                Vector3 place = Vector3Add(cube_wire[i].position, Vector3Scale(picking->collision.normal, 1.0f));
 
-    ray = GetScreenToWorldRay(GetMousePosition(), main_context->camera);
+                ecs_entity_t cube = ecs_new(it->world);
+                ecs_set(it->world, cube, cube_wire_t, {
+                    .position = place,
+                    .width = 1.0f,
+                    .height = 1.0f,
+                    .length = 1.0f,
+                    .color = BLUE
+                });
 
-    // Iterate matched entities
-    for (int i = 0; i < it->count; i++) {
-        DrawCubeWires(cube_wire[i].position, cube_wire[i].width,cube_wire[i].height,cube_wire[i].length, cube_wire[i].color);
-        collision = GetRayCollisionBox(ray,
-            (BoundingBox){(Vector3){ cube_wire[i].position.x - cube_wire[i].width/2, cube_wire[i].position.y - cube_wire[i].height/2, cube_wire[i].position.z - cube_wire[i].length/2 },
-                          (Vector3){ cube_wire[i].position.x + cube_wire[i].width/2, cube_wire[i].position.y + cube_wire[i].height/2, cube_wire[i].position.z + cube_wire[i].length/2 }} );
-        if (collision.hit){
-            cube_wire[i].color = GREEN;
-        }else{
-            cube_wire[i].color = GRAY;
+            }else{
+                cube_wire[i].color = GRAY;
+            }
+            // DrawRay(ray, MAROON);
         }
     }
 
+    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
+        picking->ray = GetScreenToWorldRay(GetMousePosition(), main_context->camera);
+        // Iterate matched entities
+        for (int i = 0; i < it->count; i++) {
+            DrawCubeWires(cube_wire[i].position, cube_wire[i].width,cube_wire[i].height,cube_wire[i].length, cube_wire[i].color);
+            picking->collision = GetRayCollisionBox(picking->ray,
+                (BoundingBox){(Vector3){ cube_wire[i].position.x - cube_wire[i].width/2, cube_wire[i].position.y - cube_wire[i].height/2, cube_wire[i].position.z - cube_wire[i].length/2 },
+                            (Vector3){ cube_wire[i].position.x + cube_wire[i].width/2, cube_wire[i].position.y + cube_wire[i].height/2, cube_wire[i].position.z + cube_wire[i].length/2 }} );
+            if (picking->collision.hit && cube_wire[i].position.x != 0 && cube_wire[i].position.y != 0 && cube_wire[i].position.z != 0){
+                // cube_wire[i].color = YELLOW;
+                ecs_delete(it->world ,it->entities[i]);
 
+            }else{
+                // cube_wire[i].color = GRAY;
+            }
+            // DrawRay(ray, MAROON);
+        }
+    }
 }
 
-
+//draw crosshair
 void render_2d_draw_cross_point(ecs_iter_t *it){
     DrawCircleLines((int)(WINDOW_WIDTH/2), (int)(WINDOW_HEIGHT/2), 8, DARKBLUE);
 }
 
-// 
+void on_add_entity(ecs_iter_t *it){
+    printf("add entity\n");
+}
+
+void on_remove_entity(ecs_iter_t *it){
+
+}
+
+// draw raylib grid
+void render_3d_grid(ecs_iter_t *it){
+    DrawGrid(10, 1.0f);
+    const picking_t *picking = ecs_singleton_get(it->world,picking_t);
+    if(picking){
+        // printf("picking\n");
+        DrawRay(picking->ray, MAROON);
+        if(picking->collision.hit){
+            // Draw a line representing the normal at the hit point
+            DrawLine3D(picking->collision.point, Vector3Add(picking->collision.point, Vector3Scale(picking->collision.normal, 1.0f)), RED);
+            DrawSphere(picking->collision.point, 0.1f, RED); // Mark the hit point
+
+        }
+    }
+}
+
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
     SetTargetFPS(60);
 
     ecs_world_t *world = ecs_init();
 
-    ECS_COMPONENT_DEFINE(world, camera_controller_t);
-    ECS_COMPONENT_DEFINE(world, cube_wire_t);
-
     // Initialize components and phases
     module_init_raylib(world);
     module_init_dev(world);
 
+    ECS_COMPONENT_DEFINE(world, camera_controller_t);
+    ECS_COMPONENT_DEFINE(world, cube_wire_t);
+    ECS_COMPONENT_DEFINE(world, picking_t);
+    ECS_COMPONENT_DEFINE(world, select_transform_3d_t);
+
     ECS_SYSTEM(world, render_3d_grid, RLRender3DPhase);
 
-    // Create observer that is invoked whenever Position is set
-    // ecs_observer(world, {
-    //     .query.terms = {{ ecs_id(Transform3D) }},
-    //     .events = { EcsOnAdd },
-    //     .callback = on_add_entity
-    // });
-
-    // does not work incorrect config
-    // ECS_SYSTEM(world, camera_input_system, LogicUpdatePhase, main_context_t, camera_controller_t);
-    // Input for camera
     ecs_system(world, {
-        .entity = ecs_entity(world, { .name = "network_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
+        .entity = ecs_entity(world, { .name = "camera_input_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
         .query.terms = {
             { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
             { .id = ecs_id(camera_controller_t), .src.id = ecs_id(camera_controller_t) }   // Singleton
@@ -220,7 +279,8 @@ int main(void) {
         .entity = ecs_entity(world, { .name = "cube_wires_picking_system", .add = ecs_ids(ecs_dependson(LogicUpdatePhase)) }),
         .query.terms = {
             { .id = ecs_id(main_context_t), .src.id = ecs_id(main_context_t) }, // Singleton
-            { .id = ecs_id(cube_wire_t) }   //
+            { .id = ecs_id(picking_t), .src.id = ecs_id(picking_t) }, // Singleton
+            { .id = ecs_id(cube_wire_t) },   //
         },
         .callback = cube_wires_picking_system
     });
@@ -229,6 +289,13 @@ int main(void) {
     ecs_system(world, {
         .entity = ecs_entity(world, { .name = "render_2d_draw_cross_point", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
         .callback = render_2d_draw_cross_point
+    });
+
+    // Create observer that is invoked whenever Position is set
+    ecs_observer(world, {
+        .query.terms = {{ ecs_id(Transform3D) }},
+        .events = { EcsOnAdd },
+        .callback = on_add_entity
     });
 
     // setup Camera 3D
@@ -248,13 +315,6 @@ int main(void) {
         .pitch = -0.592f,
     });
 
-
-    // setup Input
-    // ecs_singleton_set(world, PlayerInput_T, {
-    //   .isMovementMode=true,
-    //   .tabPressed=false
-    // });
-
     ecs_entity_t cube_wired_1 = ecs_entity(world, {
       .name = "CubeWire1"
     });
@@ -266,23 +326,21 @@ int main(void) {
         .color = BLUE
     });
 
-
-    ecs_entity_t cube_wired_2 = ecs_entity(world, {
-      .name = "CubeWire2"
-    });
-    ecs_set(world, cube_wired_2, cube_wire_t, {
-        .position = (Vector3) {0,2,0},
-        .width = 1.0f,
-        .height = 1.0f,
-        .length = 1.0f,
-        .color = RED
+    ecs_singleton_set(world,picking_t,{
+        .ray = {0},
+        .collision = {0}
     });
 
+    // setup Input
+    // ecs_singleton_set(world, PlayerInput_T, {
+    //   .isMovementMode=true,
+    //   .tabPressed=false
+    // });
 
     // create Model
     // Model cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
 
-    // Create Entity
+    // // Create Entity
     // ecs_entity_t node1 = ecs_entity(world, {
     //   .name = "NodeParent"
     // });

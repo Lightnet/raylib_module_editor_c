@@ -248,8 +248,8 @@ FetchContent_MakeAvailable(libevent)
 #================================================
 # Application
 #================================================
-# set(EXPORT_APP ON) #ON OFF bool
-set(EXPORT_APP OFF) #ON OFF bool
+set(EXPORT_APP ON) #ON OFF bool
+# set(EXPORT_APP OFF) #ON OFF bool
 if(${EXPORT_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
@@ -279,7 +279,8 @@ if(${EXPORT_APP})
         # examples/raylib3d_flecs_transform_hierarchy10.c
         # examples/raylib3d_flecs_transform_hierarchy11.c
         # examples/rl_flecs_camera3d.c 
-        examples/raylib_raycast_picking01.c 
+        # examples/raylib_raycast_picking01.c 
+        examples/c/raylib_atlas_texture.c 
         # src/example_raygui.c
         # src/example_flecs.c
         # src/raylib_flecs.c
@@ -361,7 +362,8 @@ if(${EXPORT_FLECS_APP})
         # src/main_ode_gui_test.c
         # src/main_ode_test.c
         # src/main_ode_controller_test.c
-        src/main_raylib_libevent_test.c
+        # src/main_raylib_libevent_test.c
+        src/main_editor_test.c
         # src/main_transform_3d_hierarchy_test.c
         # src/main_transform_3d_hierarchy_test01.c
         # src/main_transform_3d_hierarchy_test02.c
@@ -417,10 +419,7 @@ if(${EXPORT_FLECS_APP})
 endif()
 
 
-
-
-
-set(EXPORT_BE_APP ON)
+set(EXPORT_BE_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_BE_APP})
 
