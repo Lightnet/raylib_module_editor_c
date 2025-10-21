@@ -494,6 +494,30 @@ void render2d_hud_system(ecs_iter_t *it){
 
 }
 
+//===============================================
+// BLOCK REMOVE MODEL
+//===============================================
+
+void on_remove_block_system(ecs_iter_t *it){
+    // block_t *block = ecs_field(it, block_t, 0);
+    for (int i = 0; i < it->count; i ++) {
+        ecs_entity_t current_entity = it->entities[i];
+        const block_t *block = ecs_get(it->world, current_entity, block_t);
+        if(block){
+            printf("remove block_t\n");
+            // this handle clean up
+            // dBodyDestroy(ode_body->id);
+            if(block->model){
+                UnloadModel(*(block->model));
+            }
+        }
+    }
+}
+
+//===============================================
+//
+//===============================================
+
 // main
 int main(void) {
     InitWindow(800, 600, "Transform Hierarchy with Flecs v4.x");
@@ -646,6 +670,18 @@ int main(void) {
     ecs_singleton_set(world, player_input_t, {
       .isMovementMode=true,
       .tabPressed=false
+    });
+
+    //===============================================
+// 
+//===============================================
+
+
+// Create observer that is invoked whenever block_t model is remove
+    ecs_observer(world, {
+        .query.terms = {{ ecs_id(block_t) }},
+        .events = { EcsOnRemove },
+        .callback = on_remove_block_system
     });
 
 
