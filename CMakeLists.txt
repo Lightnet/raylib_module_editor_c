@@ -5,21 +5,21 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-
-if(NOT EXISTS "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
-    file(DOWNLOAD
-        "https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake"
-        "${CMAKE_BINARY_DIR}/cmake/CPM.cmake"
-    )
-endif()
-include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5) #need for ode
+# if(NOT EXISTS "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
+#     file(DOWNLOAD
+#         "https://github.com/cpm-cmake/CPM.cmake/releases/latest/download/CPM.cmake"
+#         "${CMAKE_BINARY_DIR}/cmake/CPM.cmake"
+#     )
+# endif()
+# include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 
 include(FetchContent)
-
 # Find OpenGL
 find_package(OpenGL REQUIRED)
-
+#================================================
+# ODE physics 3d
+#================================================
 FetchContent_Declare(
     ode
     GIT_REPOSITORY https://bitbucket.org/odedevs/ode.git
@@ -28,51 +28,20 @@ FetchContent_Declare(
     # GIT_SHALLOW TRUE
     # USES_TERMINAL_DOWNLOAD TRUE
 )
-
 set(ODE_WITH_DEMOS OFF CACHE BOOL "" FORCE)
 set(ODE_WITH_TESTS OFF CACHE BOOL "" FORCE)
 set(ODE_DOUBLE_PRECISION ON CACHE BOOL "" FORCE) # Explicitly enable double precision
 set(ODE_SHARED ON CACHE BOOL "" FORCE) # Build as shared library (DLL)
 FetchContent_MakeAvailable(ode)
 # Modified (safer)
-
 target_link_options(ODE PRIVATE
     -static-libgcc                                  # GNU Compiler Collection
     -static-libstdc++                               # Uncomment if C++ code is used
     -static                                         # Avoid full static linking to prevent issues with system libraries
 )
-
-# ODE (Open Dynamics Engine) - Add first to avoid uninstall target conflict
-# CPMAddPackage(
-#     NAME ode
-#     GIT_REPOSITORY https://bitbucket.org/odedevs/ode.git
-#     GIT_TAG 0.16.6
-#     OPTIONS
-#         "ODE_BUILD_EXAMPLES OFF"
-#         "ODE_BUILD_DEMOS OFF"
-#         "ODE_BUILD_TESTS OFF"
-#         "ODE_DOUBLE_PRECISION ON"  # Explicitly enable double precision
-#         "ODE_SHARED ON"            # Build as shared library (DLL)
-# )
-
-# if(ODE_DOUBLE_PRECISION)
-# 	set(CCD_PRECISION CCD_DOUBLE)
-# 	set(ODE_PRECISION dDOUBLE)
-# else()
-# 	set(CCD_PRECISION CCD_SINGLE)
-# 	set(ODE_PRECISION dSINGLE)
-# endif()
-# configure_file(${ode_SOURCE_DIR}/libccd/src/ccd/precision.h.in ${ode_SOURCE_DIR}/include/ccd/precision.h)
-# configure_file(${ode_SOURCE_DIR}/include/ode/precision.h.in ${ode_SOURCE_DIR}/include/ode/precision.h)
-# set(ODE_VERSION_MAJOR 0)
-# set(ODE_VERSION_MINOR 16)
-# set(ODE_VERSION_PATCH 6)
-# set(_ODE_VERSION ${ODE_VERSION_MAJOR}.${ODE_VERSION_MINOR}.${ODE_VERSION_PATCH})
-# set(ODE_VERSION ${_ODE_VERSION})
-# configure_file(${ode_SOURCE_DIR}/include/ode/version.h.in ${ode_SOURCE_DIR}/include/ode/version.h)
-
-
+#================================================
 # Fetch raylib
+#================================================
 FetchContent_Declare(
     raylib
     GIT_REPOSITORY https://github.com/raysan5/raylib.git
@@ -81,7 +50,9 @@ FetchContent_Declare(
     USES_TERMINAL_DOWNLOAD TRUE
 )
 FetchContent_MakeAvailable(raylib)
-
+#================================================
+# raygui
+#================================================
 FetchContent_Declare(
     raygui
     GIT_REPOSITORY https://github.com/raysan5/raygui.git
@@ -90,46 +61,6 @@ FetchContent_Declare(
     USES_TERMINAL_DOWNLOAD TRUE
 )
 FetchContent_MakeAvailable(raygui)
-
-# Fetch cimgui with a stable tag
-# FetchContent_Declare(
-#     cimgui
-#     GIT_REPOSITORY https://github.com/cimgui/cimgui.git
-#     GIT_TAG 1.92.1 # Matches ImGui 1.92.1 updated.
-# )
-# FetchContent_MakeAvailable(cimgui)
-
-# Define cimgui sources
-# set(IMGUI_SOURCES
-#     ${cimgui_SOURCE_DIR}/cimgui.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/imgui.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/imgui_draw.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/imgui_widgets.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/imgui_demo.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/imgui_tables.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_glfw.cpp
-#     ${cimgui_SOURCE_DIR}/imgui/backends/imgui_impl_opengl3.cpp
-# )
-
-# Build cimgui as a static library with a custom name
-# add_library(custom_cimgui STATIC ${IMGUI_SOURCES})
-
-# Set include directories for custom_cimgui
-# target_include_directories(custom_cimgui PUBLIC
-#     ${cimgui_SOURCE_DIR}                            # cimgui
-#     ${cimgui_SOURCE_DIR}/imgui                      # imgui
-#     ${raylib_SOURCE_DIR}/src/external/glfw/include  # glfw
-# )
-
-# Set compile definitions for custom_cimgui (no CIMGUI_DEFINE_ENUMS_AND_STRUCTS)
-# target_compile_definitions(custom_cimgui PUBLIC
-#     IMGUI_DISABLE_OBSOLETE_FUNCTIONS=1
-#     IMGUI_IMPL_API=extern\ \"C\"
-# )
-
-# Link custom_cimgui with GLFW and OpenGL
-# target_link_libraries(custom_cimgui PUBLIC glfw OpenGL::GL) # needed library
-
 #================================================
 # Lua
 #================================================
@@ -140,9 +71,10 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(lua)
-
+#================================================
 # Lua doesn't have a CMake build, so we manually compile it
 # List Lua source files (core and libraries, excluding lua.c and luac.c)
+#================================================
 set(LUA_SRC
     ${lua_SOURCE_DIR}/lapi.c
     ${lua_SOURCE_DIR}/lauxlib.c
@@ -177,11 +109,9 @@ set(LUA_SRC
     ${lua_SOURCE_DIR}/lzio.c
     ${lua_SOURCE_DIR}/lutf8lib.c
 )
-
 # Create a static Lua library
 add_library(lua STATIC ${LUA_SRC})
 target_include_directories(lua PUBLIC ${lua_SOURCE_DIR})
-
 #================================================
 # ENET
 #================================================
@@ -193,7 +123,9 @@ FetchContent_Declare(
 )
 set(ENET_TEST  OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(enet)
-
+#================================================
+# FLECS
+#================================================
 FetchContent_Declare(
     flecs
     GIT_REPOSITORY https://github.com/SanderMertens/flecs.git
@@ -201,7 +133,9 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(flecs)
-
+#================================================
+# CGLM
+#================================================
 FetchContent_Declare(
     cglm
     GIT_REPOSITORY https://github.com/recp/cglm.git
@@ -211,7 +145,9 @@ FetchContent_Declare(
 set(CGLM_SHARED OFF CACHE BOOL "" FORCE)
 set(CGLM_STATIC ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(cglm)
-
+#================================================
+# libevent
+#================================================
 FetchContent_Declare(
     libevent
     GIT_REPOSITORY https://github.com/libevent/libevent.git
@@ -224,9 +160,10 @@ set(EVENT__DISABLE_TESTS ON)
 set(EVENT__DISABLE_REGRESS ON)
 set(EVENT__DISABLE_THREAD_SUPPORT ON)
 set(EVENT__DISABLE_SAMPLES ON)
-
 FetchContent_MakeAvailable(libevent)
-
+#================================================
+# STB
+#================================================
 FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
@@ -236,21 +173,12 @@ FetchContent_Declare(
     USES_TERMINAL_DOWNLOAD TRUE
 )
 FetchContent_MakeAvailable(stb)
-
-
-# Now add your target, and optionally a unified uninstall
-# if(NOT TARGET uninstall)
-#     add_custom_target(uninstall
-#         COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_BINARY_DIR}/cmake_uninstall.cmake"
-#     )
-# endif()
-
 #================================================
 # Application
 #================================================
-set(EXPORT_APP ON) #ON OFF bool
-# set(EXPORT_APP OFF) #ON OFF bool
-if(${EXPORT_APP})
+# set(EXAMPLE_APP ON) #ON OFF bool
+set(EXAMPLE_APP OFF) #ON OFF bool
+if(${EXAMPLE_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
     set(SRC_FILES
@@ -420,11 +348,9 @@ if(${EXPORT_FLECS_APP})
     endif()
 endif()
 
-
 set(EXPORT_BE_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_BE_APP})
-
     message(STATUS "EXPORT LIBEVENT APP")
     set(APP_LEVENT_NAME rl_lev)
     add_executable(${APP_LEVENT_NAME}
@@ -479,17 +405,6 @@ if(${EXPORT_BE_APP})
         )
     endif()
 endif()
-
-
-
-
-
-
-
-
-
-
-
 
 set(EXPORT_ENET_APP OFF)
 # set(EXPORT_FLECS_APP OFF)
@@ -575,7 +490,6 @@ if(${EXPORT_ENET_APP})
     endif()
 endif()
 
-
 set(EXPORT_ODE_APP ON)
 # set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_ODE_APP})
@@ -621,10 +535,9 @@ if(${EXPORT_ODE_APP})
     endif()
 endif()
 
-
-set(EXPORT_EX_APP OFF) #ON OFF bool
+set(EXPORT_EXAMPLES_APP OFF) #ON OFF bool
 # set(EXPORT_EX_APP ON) #ON OFF bool
-if(${EXPORT_EX_APP})
+if(${EXPORT_EXAMPLES_APP})
 
     # Define the list of example source files
     set(examples

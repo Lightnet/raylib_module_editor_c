@@ -8,8 +8,8 @@
 #include "module_dev.h"
 #include "raygui.h"
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 600
+int WINDOW_WIDTH = 800;
+int WINDOW_HEIGHT = 600;
 #define MOUSE_SENSITIVITY 0.002f
 #define MOVE_SPEED 5.0f
 #define SPRINT_MULTIPLIER 2.0f
@@ -165,7 +165,6 @@ void UpdateMeshUVs(Mesh* mesh, int tileIndices[6]){
     UpdateMeshBuffer(*mesh, 1, mesh->texcoords, mesh->vertexCount * 2 * sizeof(float), 0);  // Update UVs
 }
 
-
 //===============================================
 // SYSTEMS
 //===============================================
@@ -174,7 +173,6 @@ void UpdateMeshUVs(Mesh* mesh, int tileIndices[6]){
 void camera_input_system(ecs_iter_t *it){
     main_context_t *main_context = ecs_field(it, main_context_t, 0);
     camera_controller_t *camera_controller = ecs_field(it, camera_controller_t, 1);
-
 
     if(IsKeyPressed(KEY_F1)){
         if (IsCursorHidden()) EnableCursor();
@@ -361,7 +359,6 @@ void render_3d_grid(ecs_iter_t *it){
             // Draw a line representing the normal at the hit point
             DrawLine3D(picking->collision.point, Vector3Add(picking->collision.point, Vector3Scale(picking->collision.normal, 1.0f)), RED);
             DrawSphere(picking->collision.point, 0.1f, RED); // Mark the hit point
-
         }
     }
 }
@@ -510,7 +507,7 @@ void transform_3D_gui_list_system(ecs_iter_t *it) {
 
 
 //===============================================
-// BLOCKS
+// BLOCKS systems
 //===============================================
 
 
@@ -571,7 +568,7 @@ void on_remove_block_system(ecs_iter_t *it){
 // MAIN
 //===============================================
 int main(void) {
-    InitWindow(800, 600, "Transform Hierarchy with Flecs v4.1.1");
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Editor Flecs v4.1.1");
     SetTargetFPS(60);
 
     ecs_world_t *world = ecs_init();
@@ -690,11 +687,18 @@ int main(void) {
     });
 
     //===========================================
-    // ENTITY
+    // Models
     //===========================================
 
     // create Model
     Model model_cube = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+
+
+
+
+    //===========================================
+    // ENTITY
+    //===========================================
 
     ecs_entity_t cube_wired_1 = ecs_entity(world, {
       .name = "CubeWire1"

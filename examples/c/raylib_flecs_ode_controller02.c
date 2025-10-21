@@ -234,14 +234,6 @@ void on_reset_cube_system(ecs_iter_t *it) {
                 dBodySetPosition(body, x, y, z);
                 dBodySetLinearVel(body, 0, 0, 0);
                 dBodySetAngularVel(body, 0, 0, 0);
-
-                // Declare a 3x3 rotation matrix
-                dMatrix3 R;
-                // Set R to the identity matrix
-                dRSetIdentity(R);
-                // Apply the identity rotation to the body
-                dBodySetRotation(body, R);
-                
                 
                 printf("Reset entity %lu to (%.2f, %.2f, %.2f)\n", 
                     (unsigned long)entity, x, y, z);
@@ -267,6 +259,71 @@ void input_reset_cube_system(ecs_iter_t *it){
 }
 
 // player contoller movement
+/*
+void player_controller_input_system(ecs_iter_t *it){
+    //const RenderContext *rctx = ecs_singleton_get(it->world, RenderContext);
+    player_controller_t *player_controller = ecs_field(it, player_controller_t, 0);// index 0 for flecs 4.1
+    RenderContext *rctx = ecs_field(it, RenderContext, 1);
+
+    // Check if the referenced entity exists
+    if (!ecs_is_valid(it->world, player_controller->id)) {
+        // Disable GUI if entity doesn’t exist
+        return;
+    }
+    dReal force_scale = 100.0; // Adjust for desired acceleration
+    dReal damping_idle = 5.0;  // High damping when not moving
+    dReal damping_move = 0.01;  // Low damping when moving
+    dReal desired_speed = 5.0; // Tweak for desired movement speed
+
+    // dReal damping_move = 0.5;  // Low damping when moving
+
+    const OdeBody *ode_body = ecs_get(it->world, player_controller->id, OdeBody);
+
+    const dReal *R = dBodyGetRotation(ode_body->id);
+    dVector3 forward_vec = { R[0], R[4], R[8] }; // X-axis in local space
+    dVector3 strafe_vec = { R[1], R[5], R[9] };  // Y-axis in local space
+    // printf("x: %0.f", forward_vec[1]);
+    if (IsKeyPressed(KEY_W)) {
+        
+        int forward_input = 1;
+        int strafe_input = 0;
+        printf("test W\n");
+        // dBodySetLinearDamping(ode_body->id, 0.01);
+        // dBodySetAngularDamping(ode_body->id, 0.01);
+        // // dBodySetLinearDamping(ode_body->id, damping_move);
+        // dBodyAddForce(ode_body->id, forward_vec[0] * forward_input * force_scale,
+        //                            forward_vec[1] * forward_input * force_scale,
+        //                            forward_vec[2] * forward_input * force_scale);
+        // dBodyAddForce(ode_body->id, strafe_vec[0] * strafe_input * force_scale,
+        //                            strafe_vec[1] * strafe_input * force_scale,
+        //                            strafe_vec[2] * strafe_input * force_scale);
+
+        dBodySetLinearVel(ode_body->id,
+                  forward_vec[0] * desired_speed,
+                  forward_vec[1] * desired_speed,
+                  forward_vec[2] * desired_speed);
+
+    }
+
+    if (IsKeyPressed(KEY_S)) {
+        printf("test S\n");
+    }
+
+    if (IsKeyPressed(KEY_A)) {
+        printf("test A\n");
+    }
+
+    if (IsKeyPressed(KEY_D)) {
+        printf("test D\n");
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        printf("test space\n");
+        dBodyAddForce(ode_body->id, 0, 500, 0); // Apply a vertical impulse
+    }
+}
+*/
+
 void player_controller_input_system(ecs_iter_t *it) {
     player_controller_t *player_controller = ecs_field(it, player_controller_t, 0);
     RenderContext *rctx = ecs_field(it, RenderContext, 1);
@@ -286,50 +343,25 @@ void player_controller_input_system(ecs_iter_t *it) {
     dReal damping_move = 0.1;     // Low damping when moving
     dReal desired_speed = 5.0;    // Target speed for movement
 
-    // Get player position
-    const dReal *player_pos = dBodyGetPosition(ode_body->id);
-    Vector3 target = { (float)player_pos[0], (float)player_pos[1] + 0.5f, (float)player_pos[2] }; // Offset to cube center
+    // Get the cube's rotation matrix to determine forward and strafe directions
+    const dReal *R = dBodyGetRotation(ode_body->id);
+    dVector3 forward_vec = { R[8], R[9], R[10] }; // Z-axis in ODE (forward)
+    dVector3 strafe_vec = { R[0], R[1], R[2] };   // X-axis in ODE (right)
 
-    // Camera parameters
-    static float yaw = 0.0f; // Horizontal angle around player
-    const float pitch = -45.0f * DEG2RAD; // Fixed 45-degree downward angle
-    const float distance = 10.0f; // Distance from player
-    const float height_offset = 5.0f; // Height above player
+    // Normalize vectors to ensure consistent force application
+    dReal forward_len = sqrt(forward_vec[0] * forward_vec[0] + forward_vec[1] * forward_vec[1] + forward_vec[2] * forward_vec[2]);
+    dReal strafe_len = sqrt(strafe_vec[0] * strafe_vec[0] + strafe_vec[1] * strafe_vec[1] + strafe_vec[2] * strafe_vec[2]);
 
-    // Update yaw based on mouse movement (when right mouse button is held)
-    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
-        Vector2 mouse_delta = GetMouseDelta();
-        yaw -= mouse_delta.x * 0.005f; // Adjust sensitivity
+    if (forward_len > 0) {
+        forward_vec[0] /= forward_len;
+        forward_vec[1] /= forward_len;
+        forward_vec[2] /= forward_len;
     }
-
-    // Calculate camera position
-    float cam_x = target.x + distance * cosf(yaw) * cosf(pitch);
-    float cam_y = target.y + height_offset;
-    float cam_z = target.z + distance * sinf(yaw) * cosf(pitch);
-
-    // Update camera in RenderContext
-    rctx->camera.position = (Vector3){ cam_x, cam_y, cam_z };
-    rctx->camera.target = target;
-    rctx->camera.up = (Vector3){ 0.0f, 1.0f, 0.0f }; // Ensure up vector is correct
-    rctx->camera.fovy = 45.0f;
-    rctx->camera.projection = CAMERA_PERSPECTIVE;
-
-    // Mark RenderContext as modified
-    ecs_modified(it->world, ecs_id(RenderContext), RenderContext);
-
-    // Calculate camera forward vector (from camera to target)
-    Vector3 cam_forward = Vector3Normalize(Vector3Subtract(target, rctx->camera.position));
-    // Project to XZ plane for movement (ignore Y component)
-    cam_forward.y = 0.0f;
-    cam_forward = Vector3Normalize(cam_forward);
-
-    // Calculate strafe vector (perpendicular to forward and up)
-    Vector3 up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    Vector3 cam_strafe = Vector3Normalize(Vector3CrossProduct(cam_forward, up));
-
-    // Convert to ODE vectors
-    dVector3 forward_vec = { cam_forward.x, cam_forward.y, cam_forward.z };
-    dVector3 strafe_vec = { cam_strafe.x, cam_strafe.y, cam_strafe.z };
+    if (strafe_len > 0) {
+        strafe_vec[0] /= strafe_len;
+        strafe_vec[1] /= strafe_len;
+        strafe_vec[2] /= strafe_len;
+    }
 
     // Input handling for movement
     int forward_input = 0;
@@ -392,6 +424,38 @@ void player_controller_input_system(ecs_iter_t *it) {
             dBodyAddForce(ode_body->id, 0, jump_force, 0);
         }
     }
+
+    // Camera control
+    // Get player position
+    const dReal *player_pos = dBodyGetPosition(ode_body->id);
+    Vector3 target = { (float)player_pos[0], (float)player_pos[1] + 0.5f, (float)player_pos[2] }; // Offset to cube center
+
+    // Camera parameters
+    static float yaw = 0.0f; // Horizontal angle around player
+    const float pitch = -45.0f * DEG2RAD; // Fixed 45-degree downward angle
+    const float distance = 10.0f; // Distance from player
+    const float height_offset = 5.0f; // Height above player
+
+    // Update yaw based on mouse movement (when right mouse button is held)
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+        Vector2 mouse_delta = GetMouseDelta();
+        yaw -= mouse_delta.x * 0.005f; // Adjust sensitivity
+    }
+
+    // Calculate camera position
+    float cam_x = target.x + distance * cosf(yaw) * cosf(pitch);
+    float cam_y = target.y + height_offset;
+    float cam_z = target.z + distance * sinf(yaw) * cosf(pitch);
+
+    // Update camera in RenderContext
+    rctx->camera.position = (Vector3){ cam_x, cam_y, cam_z };
+    rctx->camera.target = target;
+    rctx->camera.up = (Vector3){ 0.0f, 1.0f, 0.0f }; // Ensure up vector is correct
+    rctx->camera.fovy = 45.0f;
+    rctx->camera.projection = CAMERA_PERSPECTIVE;
+
+    // Mark RenderContext as modified
+    ecs_modified(it->world, ecs_id(RenderContext), RenderContext);
 }
 
 
@@ -458,7 +522,7 @@ int main() {
     const float cube_size = 1.0f;
 
     // Initialize Raylib
-    InitWindow(800, 600, "Controller Cube Drop Simulation (ODE, Flecs Components)");
+    InitWindow(800, 600, "Cube Drop Simulation (ODE with Flecs Components) - Press R to Reset");
     SetTargetFPS(60);
 
     Camera3D camera = { 0 };
