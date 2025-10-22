@@ -2,11 +2,7 @@
 // raylb 5.5
 // ode 0.16.6
 // fixed but move and jump highter.
-// KEY_C = enable/disable mouse orbiting
-// mouse motion to rotate camera
-// Q and E keys to rotate the camera’s yaw left and right
-
-
+// 
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -84,8 +80,8 @@ static void nearCallback(void *data, dGeomID o1, dGeomID o2) {
     dContact contact;
     contact.surface.mode = dContactBounce;
     // contact.surface.mu = dInfinity;// this stop sliding
-    contact.surface.mu = 1.0f; //enable sliding for cube.
-    contact.surface.bounce = 0.5f;
+    contact.surface.mu = 50.0f; //enable sliding for cube.
+    contact.surface.bounce = 0.3f;
     contact.surface.bounce_vel = 0.1f;
     contact.surface.soft_cfm = 0.01f;
 
@@ -287,7 +283,7 @@ void player_controller_input_system(ecs_iter_t *it) {
 
     // Physics movement parameters
     dReal force_scale = 100.0;    // Force magnitude for movement
-    dReal jump_force = 750.0;     // Jump force
+    dReal jump_force = 600.0;     // Reduced force for jumping (was 750.0)
     dReal damping_idle = 5.0;     // High damping when idle
     dReal damping_move = 0.1;     // Low damping when moving
     dReal desired_speed = 5.0;    // Target speed for movement
@@ -301,26 +297,11 @@ void player_controller_input_system(ecs_iter_t *it) {
     const float pitch = -45.0f * DEG2RAD; // Fixed 45-degree downward angle
     const float distance = 10.0f; // Distance from player
     const float height_offset = 5.0f; // Height above player
-    static bool mouse_orbit_enabled = true; // Toggle for mouse orbiting
 
-    // Toggle mouse orbiting with C key
-    if (IsKeyPressed(KEY_C)) {
-        mouse_orbit_enabled = !mouse_orbit_enabled;
-        printf("Mouse orbit %s\n", mouse_orbit_enabled ? "enabled" : "disabled");
-    }
-
-    // Update yaw based on mouse movement (if enabled)
-    if (mouse_orbit_enabled) {
+    // Update yaw based on mouse movement (when right mouse button is held)
+    if (IsKeyDown(MOUSE_BUTTON_RIGHT)) {
         Vector2 mouse_delta = GetMouseDelta();
         yaw -= mouse_delta.x * 0.005f; // Adjust sensitivity
-    }
-
-    // Update yaw based on keyboard input (Q/E for rotation)
-    if (IsKeyDown(KEY_Q)) {
-        yaw += 0.05f; // Rotate left
-    }
-    if (IsKeyDown(KEY_E)) {
-        yaw -= 0.05f; // Rotate right
     }
 
     // Calculate camera position
@@ -379,15 +360,15 @@ void player_controller_input_system(ecs_iter_t *it) {
     bool is_jumping = false;
     if (IsKeyPressed(KEY_SPACE)) {
         const dReal *pos = dBodyGetPosition(ode_body->id);
-        if (pos[1] < 1.5) { // Cube size is 1.0, so 1.5 is close to ground
-            if (is_moving) {
-                printf("move jump...\n");
-                dBodyAddForce(ode_body->id, 0, jump_force * 0.7f, 0);
-                is_jumping = true;
-            } else {
-                printf("d move jump...\n");
-                dBodyAddForce(ode_body->id, 0, jump_force, 0);
-                is_jumping = true;
+        if(is_moving){
+            printf("move jump...");
+            dBodyAddForce(ode_body->id, 0, 0.01f, 0);
+            is_jumping = true;
+        }else{
+            printf("d move jump...");
+            if (pos[1] < 1.5) { // Cube size is 1.0, so 1.5 is close to ground
+            dBodyAddForce(ode_body->id, 0, jump_force, 0);
+            is_jumping = true;
             }
         }
     }
@@ -434,7 +415,6 @@ void player_controller_input_system(ecs_iter_t *it) {
         dBodyAddForce(ode_body->id, force_x, 0.0, force_z); // Explicitly zero Y force
     }
 }
-
 
 // main
 int main() {

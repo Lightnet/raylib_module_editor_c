@@ -1,12 +1,6 @@
 // flecs 4.1.1
 // raylb 5.5
 // ode 0.16.6
-// fixed but move and jump highter.
-// KEY_C = enable/disable mouse orbiting
-// mouse motion to rotate camera
-// Q and E keys to rotate the camera’s yaw left and right
-
-
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -287,7 +281,7 @@ void player_controller_input_system(ecs_iter_t *it) {
 
     // Physics movement parameters
     dReal force_scale = 100.0;    // Force magnitude for movement
-    dReal jump_force = 750.0;     // Jump force
+    dReal jump_force = 500.0;     // Force for jumping
     dReal damping_idle = 5.0;     // High damping when idle
     dReal damping_move = 0.1;     // Low damping when moving
     dReal desired_speed = 5.0;    // Target speed for movement
@@ -301,26 +295,11 @@ void player_controller_input_system(ecs_iter_t *it) {
     const float pitch = -45.0f * DEG2RAD; // Fixed 45-degree downward angle
     const float distance = 10.0f; // Distance from player
     const float height_offset = 5.0f; // Height above player
-    static bool mouse_orbit_enabled = true; // Toggle for mouse orbiting
 
-    // Toggle mouse orbiting with C key
-    if (IsKeyPressed(KEY_C)) {
-        mouse_orbit_enabled = !mouse_orbit_enabled;
-        printf("Mouse orbit %s\n", mouse_orbit_enabled ? "enabled" : "disabled");
-    }
-
-    // Update yaw based on mouse movement (if enabled)
-    if (mouse_orbit_enabled) {
+    // Update yaw based on mouse movement (when right mouse button is held)
+    if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
         Vector2 mouse_delta = GetMouseDelta();
         yaw -= mouse_delta.x * 0.005f; // Adjust sensitivity
-    }
-
-    // Update yaw based on keyboard input (Q/E for rotation)
-    if (IsKeyDown(KEY_Q)) {
-        yaw += 0.05f; // Rotate left
-    }
-    if (IsKeyDown(KEY_E)) {
-        yaw -= 0.05f; // Rotate right
     }
 
     // Calculate camera position
@@ -349,8 +328,8 @@ void player_controller_input_system(ecs_iter_t *it) {
     Vector3 cam_strafe = Vector3Normalize(Vector3CrossProduct(cam_forward, up));
 
     // Convert to ODE vectors
-    dVector3 forward_vec = { cam_forward.x, 0.0, cam_forward.z }; // Explicitly zero Y component
-    dVector3 strafe_vec = { cam_strafe.x, 0.0, cam_strafe.z };   // Explicitly zero Y component
+    dVector3 forward_vec = { cam_forward.x, cam_forward.y, cam_forward.z };
+    dVector3 strafe_vec = { cam_strafe.x, cam_strafe.y, cam_strafe.z };
 
     // Input handling for movement
     int forward_input = 0;
@@ -375,63 +354,43 @@ void player_controller_input_system(ecs_iter_t *it) {
         is_moving = true;
     }
 
-    // Jump (Space key)
-    bool is_jumping = false;
-    if (IsKeyPressed(KEY_SPACE)) {
-        const dReal *pos = dBodyGetPosition(ode_body->id);
-        if (pos[1] < 1.5) { // Cube size is 1.0, so 1.5 is close to ground
-            if (is_moving) {
-                printf("move jump...\n");
-                dBodyAddForce(ode_body->id, 0, jump_force * 0.7f, 0);
-                is_jumping = true;
-            } else {
-                printf("d move jump...\n");
-                dBodyAddForce(ode_body->id, 0, jump_force, 0);
-                is_jumping = true;
-            }
-        }
-    }
-
     // Apply manual damping
-    const dReal *current_vel = dBodyGetLinearVel(ode_body->id);
-    const dReal *current_angular_vel = dBodyGetAngularVel(ode_body->id);
-    if (current_vel && current_angular_vel) {
-        // Check if cube is on or near the ground (Y position < 1.5)
-        bool is_on_ground = player_pos[1] < 1.5;
-
-        if (!is_moving) {
-            // Idle: Apply damping to X, Z, and conditionally to Y
-            dBodyAddForce(ode_body->id,
-                          -current_vel[0] * damping_idle, // X
-                          is_on_ground ? -current_vel[1] * damping_idle : 0.0, // Y (only if on ground)
-                          -current_vel[2] * damping_idle); // Z
-            dBodyAddTorque(ode_body->id,
-                           -current_angular_vel[0] * damping_idle,
-                           -current_angular_vel[1] * damping_idle,
-                           -current_angular_vel[2] * damping_idle);
-        } else {
-            // Moving: Apply damping to X, Z, and conditionally to Y
-            dBodyAddForce(ode_body->id,
-                          -current_vel[0] * damping_move, // X
-                          is_on_ground ? -current_vel[1] * damping_move : 0.0, // Y (only if on ground)
-                          -current_vel[2] * damping_move); // Z
-            dBodyAddTorque(ode_body->id,
-                           -current_angular_vel[0] * damping_move,
-                           -current_angular_vel[1] * damping_move,
-                           -current_angular_vel[2] * damping_move);
+    if (!is_moving) {
+        const dReal *current_vel = dBodyGetLinearVel(ode_body->id);
+        const dReal *current_angular_vel = dBodyGetAngularVel(ode_body->id);
+        if (current_vel && current_angular_vel) {
+            dBodyAddForce(ode_body->id, -current_vel[0] * damping_idle, -current_vel[1] * damping_idle, -current_vel[2] * damping_idle);
+            dBodyAddTorque(ode_body->id, -current_angular_vel[0] * damping_idle, -current_angular_vel[1] * damping_idle, -current_angular_vel[2] * damping_idle);
+        }
+    } else {
+        const dReal *current_vel = dBodyGetLinearVel(ode_body->id);
+        const dReal *current_angular_vel = dBodyGetAngularVel(ode_body->id);
+        if (current_vel && current_angular_vel) {
+            dBodyAddForce(ode_body->id, -current_vel[0] * damping_move, -current_vel[1] * damping_move, -current_vel[2] * damping_move);
+            dBodyAddTorque(ode_body->id, -current_angular_vel[0] * damping_move, -current_angular_vel[1] * damping_move, -current_angular_vel[2] * damping_move);
         }
     }
 
-    // Apply movement forces (only in X and Z directions, skip if jumping)
-    if (is_moving && !is_jumping) {
+    // Apply movement forces
+    if (is_moving) {
         dReal vx = (forward_vec[0] * forward_input + strafe_vec[0] * strafe_input) * desired_speed;
+        dReal vy = (forward_vec[1] * forward_input + strafe_vec[1] * strafe_input) * desired_speed;
         dReal vz = (forward_vec[2] * forward_input + strafe_vec[2] * strafe_input) * desired_speed;
 
         const dReal *current_vel = dBodyGetLinearVel(ode_body->id);
         dReal force_x = (vx - current_vel[0]) * force_scale;
+        dReal force_y = (vy - current_vel[1]) * force_scale;
         dReal force_z = (vz - current_vel[2]) * force_scale;
 
-        dBodyAddForce(ode_body->id, force_x, 0.0, force_z); // Explicitly zero Y force
+        dBodyAddForce(ode_body->id, force_x, force_y, force_z);
+    }
+
+    // Jump (Space key)
+    if (IsKeyPressed(KEY_SPACE)) {
+        const dReal *pos = dBodyGetPosition(ode_body->id);
+        if (pos[1] < 1.5) { // Cube size is 1.0, so 1.5 is close to ground
+            dBodyAddForce(ode_body->id, 0, jump_force, 0);
+        }
     }
 }
 
