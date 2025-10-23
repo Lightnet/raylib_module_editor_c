@@ -128,101 +128,143 @@ void render2d_hud_system(ecs_iter_t *it){
 
 // display transform 3d list
 void transform_3D_gui_list_system(ecs_iter_t *it) {
-    // transform_3d_gui_t *guis = ecs_field(it, transform_3d_gui_t, 0);
     transform_3d_gui_t *gui = ecs_field(it, transform_3d_gui_t, 0);
-    // printf("gui\n");
 
-    // for (int i = 0; i < it->count; i++) {
-        // transform_3d_gui_t *gui = &guis[i];
+    // Create a query for all entities with Transform3D
+    ecs_query_t *query = ecs_query(it->world, {
+        .terms = {{ ecs_id(Transform3D) }}
+    });
 
-        // Create a query for all entities with Transform3D
-        ecs_query_t *query = ecs_query(it->world, {
-            .terms = {
-                { ecs_id(Transform3D) }
+    int entity_count = 0;
+    ecs_iter_t transform_it = ecs_query_iter(it->world, query);
+    while (ecs_query_next(&transform_it)) {
+        entity_count += transform_it.count;
+    }
+
+    // Allocate buffers for entity names and IDs
+    ecs_entity_t *entity_ids = (ecs_entity_t *)RL_MALLOC(entity_count * sizeof(ecs_entity_t));
+    char **entity_names = (char **)RL_MALLOC(entity_count * sizeof(char *));
+    int index = 0;
+
+    // Populate entity names and IDs
+    transform_it = ecs_query_iter(it->world, query);
+    while (ecs_query_next(&transform_it)) {
+        for (int j = 0; j < transform_it.count; j++) {
+            const char *name = ecs_get_name(it->world, transform_it.entities[j]);
+            entity_names[index] = (char *)RL_MALLOC(256 * sizeof(char));
+            snprintf(entity_names[index], 256, "%s", name ? name : "(unnamed)");
+            entity_ids[index] = transform_it.entities[j];
+            index++;
+        }
+    }
+
+    // Create a single string for GuiListView
+    char *name_list = (char *)RL_MALLOC(entity_count * 256 * sizeof(char));
+    name_list[0] = '\0';
+    for (int j = 0; j < entity_count; j++) {
+        if (j > 0) strcat(name_list, ";");
+        strcat(name_list, entity_names[j]);
+    }
+
+    // Draw the list view on the right side
+    Rectangle list_rect = {520, 18, 240, 200}; // Reduced height for more controls
+    int scroll_index = 0;
+    
+    GuiListView(list_rect, name_list, &scroll_index, &gui->selectedIndex);
+
+    // Draw transform controls if an entity is selected
+    if (gui->selectedIndex >= 0 && gui->selectedIndex < entity_count && ecs_is_valid(it->world, entity_ids[gui->selectedIndex])) {
+        gui->id = entity_ids[gui->selectedIndex];
+        Transform3D *transform = ecs_get_mut(it->world, gui->id, Transform3D);
+        bool modified = false;
+
+        if (transform) {
+            Rectangle control_rect = {520, 228, 240, 250};
+            GuiGroupBox(control_rect, "Transform Controls");
+
+            // Position controls
+            GuiLabel((Rectangle){530, 230, 100, 20}, "Position");
+            float new_pos_x = transform->position.x;
+            float new_pos_y = transform->position.y;
+            float new_pos_z = transform->position.z;
+            GuiSlider((Rectangle){530, 250, 200, 20}, "X", TextFormat("%.2f", new_pos_x), &new_pos_x, -10.0f, 10.0f);
+            GuiSlider((Rectangle){530, 270, 200, 20}, "Y", TextFormat("%.2f", new_pos_y), &new_pos_y, -10.0f, 10.0f);
+            GuiSlider((Rectangle){530, 290, 200, 20}, "Z", TextFormat("%.2f", new_pos_z), &new_pos_z, -10.0f, 10.0f);
+            if (new_pos_x != transform->position.x || new_pos_y != transform->position.y || new_pos_z != transform->position.z) {
+                transform->position.x = new_pos_x;
+                transform->position.y = new_pos_y;
+                transform->position.z = new_pos_z;
+                modified = true;
             }
-        });
 
-        // Count entities to allocate buffer for names
-        int entity_count = 0;
-        ecs_iter_t transform_it = ecs_query_iter(it->world, query);
-        while (ecs_query_next(&transform_it)) {
-            entity_count += transform_it.count;
-        }
+            // Rotation controls (using Euler angles)
+            GuiLabel((Rectangle){530, 310, 100, 20}, "Rotation");
+            Vector3 euler = QuaternionToEuler(transform->rotation);
+            euler.x = RAD2DEG * euler.x;
+            euler.y = RAD2DEG * euler.y;
+            euler.z = RAD2DEG * euler.z;
+            float new_rot_x = euler.x;
+            float new_rot_y = euler.y;
+            float new_rot_z = euler.z;
+            GuiSlider((Rectangle){530, 330, 200, 20}, "X", TextFormat("%.2f", new_rot_x), &new_rot_x, -180.0f, 180.0f);
+            GuiSlider((Rectangle){530, 350, 200, 20}, "Y", TextFormat("%.2f", new_rot_y), &new_rot_y, -180.0f, 180.0f);
+            GuiSlider((Rectangle){530, 370, 200, 20}, "Z", TextFormat("%.2f", new_rot_z), &new_rot_z, -180.0f, 180.0f);
+            if (new_rot_x != euler.x || new_rot_y != euler.y || new_rot_z != euler.z) {
+                transform->rotation = QuaternionFromEuler(DEG2RAD * new_rot_x, DEG2RAD * new_rot_y, DEG2RAD * new_rot_z);
+                modified = true;
+            }
 
-        // Allocate buffers for entity names and IDs
-        ecs_entity_t *entity_ids = (ecs_entity_t *)RL_MALLOC(entity_count * sizeof(ecs_entity_t));
-        char **entity_names = (char **)RL_MALLOC(entity_count * sizeof(char *));
-        int index = 0;
+            // Scale controls
+            GuiLabel((Rectangle){530, 390, 100, 20}, "Scale");
+            float new_scale_x = transform->scale.x;
+            float new_scale_y = transform->scale.y;
+            float new_scale_z = transform->scale.z;
+            GuiSlider((Rectangle){530, 410, 200, 20}, "X", TextFormat("%.2f", new_scale_x), &new_scale_x, 0.1f, 5.0f);
+            GuiSlider((Rectangle){530, 430, 200, 20}, "Y", TextFormat("%.2f", new_scale_y), &new_scale_y, 0.1f, 5.0f);
+            GuiSlider((Rectangle){530, 450, 200, 20}, "Z", TextFormat("%.2f", new_scale_z), &new_scale_z, 0.1f, 5.0f);
+            if (new_scale_x != transform->scale.x || new_scale_y != transform->scale.y || new_scale_z != transform->scale.z) {
+                transform->scale.x = new_scale_x;
+                transform->scale.y = new_scale_y;
+                transform->scale.z = new_scale_z;
+                modified = true;
+            }
 
-        // Populate entity names and IDs
-        transform_it = ecs_query_iter(it->world, query);
-        while (ecs_query_next(&transform_it)) {
-            for (int j = 0; j < transform_it.count; j++) {
-                const char *name = ecs_get_name(it->world, transform_it.entities[j]);
-                entity_names[index] = (char *)RL_MALLOC(256 * sizeof(char));
-                snprintf(entity_names[index], 256, "%s", name ? name : "(unnamed)");
-                entity_ids[index] = transform_it.entities[j];
-                // printf("Entity %d: %s (ID: %llu)\n", index, entity_names[index], (unsigned long long)entity_ids[index]);
-                index++;
+            // Mark transform and descendants as dirty if modified
+            if (modified) {
+                transform->isDirty = true;
+                // UpdateChildTransformOnly(it->world, gui->id); // Update child and descendants immediately
+                // ecs_modified(it->world, gui->id, Transform3D);
+
+                // Mark all descendants as dirty
+                // ecs_iter_t child_it = ecs_children(it->world, gui->id);
+                // while (ecs_children_next(&child_it)) {
+                //     for (int j = 0; j < child_it.count; j++) {
+                //         if (ecs_has(child_it.world, child_it.entities[j], Transform3D)) {
+                //             Transform3D *child_transform = ecs_get_mut(child_it.world, child_it.entities[j], Transform3D);
+                //             if (child_transform) {
+                //                 child_transform->isDirty = true;
+                //                 ecs_modified(child_it.world, child_it.entities[j], Transform3D);
+                //             }
+                //         }
+                //     }
+                // }
             }
         }
+    }
+    list_rect.y -= 8.0f;
+    list_rect.height += 8.0f;
+    GuiGroupBox(list_rect, "Entity List");
 
-        // Create a single string for GuiListView (concatenate names with semicolons)
-        char *name_list = (char *)RL_MALLOC(entity_count * 256 * sizeof(char));
-        name_list[0] = '\0';
-        for (int j = 0; j < entity_count; j++) {
-            if (j > 0) strcat(name_list, ";");
-            strcat(name_list, entity_names[j]);
-        }
-        // printf("Name list: %s\n", name_list);
-
-        // Draw the list view on the left side
-        Rectangle list_rect = {560, 20, 240, 200};
-        int scroll_index = 0;
-        int prev_selected_index = gui->selectedIndex; // Store previous index for comparison
-
-        // Debug: Print current selected index before GuiListView
-        // printf("Before GuiListView - Current selectedIndex: %d\n", gui->selectedIndex);
-
-        
-        GuiListView(list_rect, name_list, &scroll_index, &gui->selectedIndex);
-
-        // Debug: Print gui->selectedIndex after GuiListView
-        // printf("After GuiListView - gui->selectedIndex: %d\n", gui->selectedIndex);
-
-        // Update transform_3d_gui_t.id if the selection changed
-        if (gui->selectedIndex >= 0 && gui->selectedIndex < entity_count && ecs_is_valid(it->world, entity_ids[gui->selectedIndex])) {
-            if (gui->id != entity_ids[gui->selectedIndex] || gui->selectedIndex != prev_selected_index) {
-                gui->id = entity_ids[gui->selectedIndex];
-                // printf("Selected entity: %s (ID: %llu), Index: %d\n",
-                //        entity_names[gui->selectedIndex],
-                //        (unsigned long long)gui->id,
-                //        gui->selectedIndex);
-            } else {
-                // printf("No change in selection: %s (ID: %llu), Index: %d\n",
-                //        entity_names[gui->selectedIndex],
-                //        (unsigned long long)gui->id,
-                //        gui->selectedIndex);
-            }
-        } else {
-            // printf("Invalid selection: selectedIndex=%d, entity_count=%d, valid=%d\n",
-            //        gui->selectedIndex, entity_count,
-            //        gui->selectedIndex < entity_count ? ecs_is_valid(it->world, entity_ids[gui->selectedIndex]) : 0);
-        }
-        GuiGroupBox(list_rect, "Entity List");
-
-        // Clean up
-        for (int j = 0; j < entity_count; j++) {
-            RL_FREE(entity_names[j]);
-        }
-        RL_FREE(entity_names);
-        RL_FREE(entity_ids);
-        RL_FREE(name_list);
-
-        // Free the query
-        ecs_query_fini(query);
-    // }
+    // Clean up
+    for (int j = 0; j < entity_count; j++) {
+        RL_FREE(entity_names[j]);
+    }
+    RL_FREE(entity_names);
+    RL_FREE(entity_ids);
+    RL_FREE(name_list);
+    ecs_query_fini(query);
 }
+
 
 // transform 3d position, rotate, scale.
 void transform_3D_gui_system(ecs_iter_t *it) {
@@ -385,13 +427,13 @@ int main(void) {
     });
 
     // transform 3d controls
-    ecs_system(world, {
-      .entity = ecs_entity(world, { .name = "transform_3D_gui_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
-      .query.terms = {
-        { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  } // Singleton source
-      },
-      .callback = transform_3D_gui_system
-    });
+    // ecs_system(world, {
+    //   .entity = ecs_entity(world, { .name = "transform_3D_gui_system", .add = ecs_ids(ecs_dependson(RLRender2D1Phase)) }),
+    //   .query.terms = {
+    //     { .id = ecs_id(transform_3d_gui_t), .src.id = ecs_id(transform_3d_gui_t)  } // Singleton source
+    //   },
+    //   .callback = transform_3D_gui_system
+    // });
 
     // transform 3d list
     ecs_system(world, {

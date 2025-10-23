@@ -215,6 +215,7 @@ if(${EXAMPLE_APP})
         # examples/c/raylib_atlas_texture.c 
         # examples/c/raylib_noise_texture.c 
         examples/c/raylib_flecs_models.c 
+
     )
 
     # Link application with custom_cimgui
@@ -298,6 +299,8 @@ if(${EXPORT_FLECS_APP})
         # src/main_transform_3d_hierarchy_test01.c
         # src/main_transform_3d_hierarchy_test02.c
         # src/main.c
+        # examples/module/main_transform_3d_hierarchy_test01.c
+        # examples/module/main_transform_3d_hierarchy_test02.c
     )
 
     target_compile_definitions(${APP_FLECS_NAME1} PRIVATE 

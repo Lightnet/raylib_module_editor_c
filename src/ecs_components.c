@@ -109,50 +109,31 @@ void UpdateTransform(ecs_world_t *world, ecs_entity_t entity, Transform3D *trans
   transform->isDirty = false;
 }
 
-// Recursive function to process entity and its children
-void ProcessEntityHierarchy(ecs_world_t *world, ecs_entity_t entity) {
-  // Update the current entity's transform
-  Transform3D *transform = ecs_get_mut(world, entity, Transform3D);
-  if (transform) {
-    // Only update if dirty or parent is dirty
-    ecs_entity_t parent = ecs_get_parent(world, entity);
-    bool parentIsDirty = false;
-    if (parent && ecs_is_valid(world, parent)) {
-      const Transform3D *parent_transform = ecs_get(world, parent, Transform3D);
-      if (parent_transform && parent_transform->isDirty) {
-        parentIsDirty = true;
-      }
-    }
-    if (transform->isDirty || parentIsDirty) {
-      UpdateTransform(world, entity, transform);
-    }
-  }
-}
-
-// System to update all transforms in hierarchical order
-void UpdateTransformHierarchySystem(ecs_iter_t *it) {
-  // Process only root entities (no parent)
-  Transform3D *transforms = ecs_field(it, Transform3D, 0);
-  for (int i = 0; i < it->count; i++) {
-      ecs_entity_t entity = it->entities[i];
-      ProcessEntityHierarchy(it->world, entity);
-  }
-}
-
 // Function to update a single entity and its descendants
-void UpdateChildTransformOnly(ecs_world_t *world, ecs_entity_t entity) {
+void UpdateChildTransform(ecs_world_t *world, ecs_entity_t entity) {
     Transform3D *transform = ecs_get_mut(world, entity, Transform3D);
     if (!transform) return;
 
     // Update the entity's transform
     UpdateTransform(world, entity, transform);
-    ecs_modified(world, entity, Transform3D);
+    // ecs_modified(world, entity, Transform3D);
 
     // Recursively update descendants
     ecs_iter_t it = ecs_children(world, entity);
     while (ecs_children_next(&it)) {
         for (int i = 0; i < it.count; i++) {
-            UpdateChildTransformOnly(world, it.entities[i]);
+            UpdateChildTransform(world, it.entities[i]);
+        }
+    }
+}
+
+// System to process Transform3D entities
+void update_transform_3d_system(ecs_iter_t *it) {
+    // Transform3D *guis = ecs_field(it, Transform3D, 0);
+    for (int i = 0; i < it->count; i++) {
+        ecs_entity_t entity = it->entities[i];
+        if (ecs_is_valid(it->world, entity) && ecs_has(it->world, entity, Transform3D)) {
+            UpdateChildTransform(it->world, entity);
         }
     }
 }
@@ -228,17 +209,6 @@ void RLEndDrawingSystem(ecs_iter_t *it) {
   EndDrawing();
 }
 
-// System to process Transform3D entities
-void update_child_only_system(ecs_iter_t *it) {
-    Transform3D *guis = ecs_field(it, Transform3D, 0);
-    for (int i = 0; i < it->count; i++) {
-        ecs_entity_t entity = it->entities[i];
-        if (ecs_is_valid(it->world, entity) && ecs_has(it->world, entity, Transform3D)) {
-            UpdateChildTransformOnly(it->world, entity);
-        }
-    }
-}
-
 // setup phase for pipeline loop
 void setup_phases(ecs_world_t *world){
     // Define custom phases
@@ -286,14 +256,14 @@ void setup_systems(ecs_world_t *world){
     // transform 3d Hierarchy update
     ecs_system(world, {
         .entity = ecs_entity(world, {
-            .name = "update_child_only_system",
+            .name = "update_transform_3d_system",
             .add = ecs_ids(ecs_dependson(PreLogicUpdatePhase))
         }),
         .query.terms = {
             // { .id = ecs_id(TransformGUI), .src.id = EcsSelf }
             { .id = ecs_id(Transform3D), .src.id = EcsSelf }
         },
-        .callback = update_child_only_system
+        .callback = update_transform_3d_system
     });
 
     // note this has be in order of the ECS since push into array.

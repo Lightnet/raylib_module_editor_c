@@ -472,22 +472,22 @@ void transform_3D_gui_list_system(ecs_iter_t *it) {
             // Mark transform and descendants as dirty if modified
             if (modified) {
                 transform->isDirty = true;
-                UpdateChildTransformOnly(it->world, gui->id); // Update child and descendants immediately
+                // UpdateChildTransformOnly(it->world, gui->id); // Update child and descendants immediately
                 // ecs_modified(it->world, gui->id, Transform3D);
 
                 // Mark all descendants as dirty
-                ecs_iter_t child_it = ecs_children(it->world, gui->id);
-                while (ecs_children_next(&child_it)) {
-                    for (int j = 0; j < child_it.count; j++) {
-                        if (ecs_has(child_it.world, child_it.entities[j], Transform3D)) {
-                            Transform3D *child_transform = ecs_get_mut(child_it.world, child_it.entities[j], Transform3D);
-                            if (child_transform) {
-                                child_transform->isDirty = true;
-                                ecs_modified(child_it.world, child_it.entities[j], Transform3D);
-                            }
-                        }
-                    }
-                }
+                // ecs_iter_t child_it = ecs_children(it->world, gui->id);
+                // while (ecs_children_next(&child_it)) {
+                //     for (int j = 0; j < child_it.count; j++) {
+                //         if (ecs_has(child_it.world, child_it.entities[j], Transform3D)) {
+                //             Transform3D *child_transform = ecs_get_mut(child_it.world, child_it.entities[j], Transform3D);
+                //             if (child_transform) {
+                //                 child_transform->isDirty = true;
+                //                 ecs_modified(child_it.world, child_it.entities[j], Transform3D);
+                //             }
+                //         }
+                //     }
+                // }
             }
         }
     }
@@ -646,7 +646,6 @@ int main(void) {
         .callback = transform_3D_gui_list_system
     });
 
-
     // Create observer that is invoked whenever Position is set
     ecs_observer(world, {
         .query.terms = {{ ecs_id(Transform3D) }},
@@ -695,6 +694,27 @@ int main(void) {
 
 
 
+    // Load texture atlas (ensure resources/simple_color64x64.png exists)
+    Image atlasImage = LoadImage("resources/simple_color64x64.png");
+    if (atlasImage.data == NULL) {
+        TraceLog(LOG_ERROR, "Failed to load texture: resources/simple_color64x64.png");
+        CloseWindow();
+        return 1;
+    }
+    ImageFormat(&atlasImage, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);  // Ensure RGBA
+    Texture2D atlasTexture = LoadTextureFromImage(atlasImage);
+    UnloadImage(atlasImage);  // Free image
+
+    // Tile indices for each face (front, back, left, right, top, bottom)
+    // int tileIndices[6] = { 0, 1, 2, 3, 4, 5 };  // Example: different tiles per face
+    int tileIndices[6] = { 8, 2, 2, 2, 2, 2 };  // Example: different tiles per face
+
+    // Create cube mesh and model
+    Mesh cubeMesh = GenMeshCubeCustomUV(1.0f, 1.0f, 1.0f, tileIndices);
+    Model cubeModel = LoadModelFromMesh(cubeMesh);
+    SetMaterialTexture(&cubeModel.materials[0], MATERIAL_MAP_DIFFUSE, atlasTexture);
+
+
 
     //===========================================
     // ENTITY
@@ -723,7 +743,8 @@ int main(void) {
         .isDirty = true
     });
     // ecs_set(world, cube_1, ModelComponent, {&model_cube});
-    ecs_set(world, cube_1, block_t, {&model_cube});
+    // ecs_set(world, cube_1, block_t, {&model_cube});
+    ecs_set(world, cube_1, block_t, {&cubeModel});
 
 
     ecs_singleton_set(world, transform_3d_gui_t, {

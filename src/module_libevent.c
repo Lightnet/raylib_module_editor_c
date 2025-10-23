@@ -1,16 +1,17 @@
 // module_libevent.c
+// note that stacking on_receive_libevent_packed filter will crashed. might be misconfig.
 #include "ecs_components.h"
 #include "module_libevent.h"
 #include <string.h>
 #include <stdlib.h>
 
 // Define global constants and storage for connected clients
-#define MAX_CLIENTS 10
-static struct bufferevent *connected_clients[MAX_CLIENTS] = {0};
-static int num_clients = 0;
+int MAX_CLIENTS = 10;
+// static struct bufferevent *connected_clients[MAX_CLIENTS] = {0};
+// static int num_clients = 0;
 
-#define SERVER_PORT 8080
-#define SERVER_ADDRESS "127.0.0.1"
+// #define SERVER_PORT 8080
+// #define SERVER_ADDRESS "127.0.0.1"
 
 // Declare and define component in the source file
 ECS_COMPONENT_DECLARE(libevent_base_t);
@@ -20,6 +21,7 @@ ECS_COMPONENT_DECLARE(libevent_context_t);
 ECS_COMPONENT_DECLARE(libevent_bev_t);
 ECS_COMPONENT_DECLARE(libevent_packet_t);
 
+// event dispatch for network get data...
 ecs_entity_t libevent_receive_packed;
 
 //===============================================
@@ -160,23 +162,22 @@ void server_read_cb(struct bufferevent *bev, void *ctx) {
 }
 */
 
-
 // Server: Handle client errors or disconnection
 void server_error_cb(struct bufferevent *bev, short events, void *ctx) {
     libevent_context_t *app = (libevent_context_t *)ctx;
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
-        for (int i = 0; i < num_clients; i++) {
-            if (connected_clients[i] == bev) {
-                connected_clients[i] = NULL;
-                for (int j = i; j < num_clients - 1; j++) {
-                    connected_clients[j] = connected_clients[j + 1];
-                }
-                connected_clients[num_clients - 1] = NULL;
-                num_clients--;
-                snprintf(app->status, sizeof(app->status), "Server: Client %d disconnected", i + 1);
-                break;
-            }
-        }
+        // for (int i = 0; i < num_clients; i++) {
+        //     if (connected_clients[i] == bev) {
+        //         connected_clients[i] = NULL;
+        //         for (int j = i; j < num_clients - 1; j++) {
+        //             connected_clients[j] = connected_clients[j + 1];
+        //         }
+        //         connected_clients[num_clients - 1] = NULL;
+        //         num_clients--;
+        //         snprintf(app->status, sizeof(app->status), "Server: Client %d disconnected", i + 1);
+        //         break;
+        //     }
+        // }
         // handle remove client
         if(app->world){
             ecs_query_t *q = ecs_query(app->world, {
@@ -208,12 +209,15 @@ void server_error_cb(struct bufferevent *bev, short events, void *ctx) {
 void server_accept_cb(struct evconnlistener *listener, evutil_socket_t fd, struct sockaddr *addr, int len, void *ctx) {
     libevent_context_t *app = (libevent_context_t *)ctx;
     struct event_base *base = evconnlistener_get_base(listener);
-    if (num_clients >= MAX_CLIENTS) {
-        closesocket(fd);
-        snprintf(app->status, sizeof(app->status), "Server: Max clients reached");
-        ecs_singleton_modified(app->world, libevent_context_t);
-        return;
-    }
+    //TODO: need create query here for count.
+
+
+    // if (num_clients >= MAX_CLIENTS) {
+    //     closesocket(fd);
+    //     snprintf(app->status, sizeof(app->status), "Server: Max clients reached");
+    //     ecs_singleton_modified(app->world, libevent_context_t);
+    //     return;
+    // }
     struct bufferevent *bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
     if (!bev) {
         closesocket(fd);
@@ -223,7 +227,7 @@ void server_accept_cb(struct evconnlistener *listener, evutil_socket_t fd, struc
     }
     bufferevent_setcb(bev, server_read_cb, NULL, server_error_cb, app);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
-    connected_clients[num_clients++] = bev;
+    // connected_clients[num_clients++] = bev;
 
     if(app->world){
         ecs_entity_t e = ecs_new(app->world);
@@ -232,7 +236,7 @@ void server_accept_cb(struct evconnlistener *listener, evutil_socket_t fd, struc
         });
     }
 
-    snprintf(app->status, sizeof(app->status), "Server: Client %d connected", num_clients);
+    // snprintf(app->status, sizeof(app->status), "Server: Client %d connected", num_clients);
     // ecs_singleton_modified(app->world, libevent_context_t);
 }
 
@@ -341,13 +345,14 @@ void on_remove_server(ecs_iter_t *it) {
         ecs_singleton_remove(it->world, libevent_base_t);
     }
 
-    for (int i = 0; i < num_clients; i++) {
-        if (connected_clients[i]) {
-            bufferevent_free(connected_clients[i]);
-            connected_clients[i] = NULL;
-        }
-    }
-    num_clients = 0;
+    // TODO:need to add remove event for client.
+    // for (int i = 0; i < num_clients; i++) {
+    //     if (connected_clients[i]) {
+    //         bufferevent_free(connected_clients[i]);
+    //         connected_clients[i] = NULL;
+    //     }
+    // }
+    // num_clients = 0;
 
     snprintf(app->status, sizeof(app->status), "Server: Shut down");
     // ecs_singleton_modified(it->world, libevent_context_t);
@@ -572,7 +577,6 @@ void setup_components_libevent(ecs_world_t *world){
 }
 
 void module_init_libevent(ecs_world_t *world){
-
     setup_components_libevent(world);
     setup_systems_libevent(world);
 }
