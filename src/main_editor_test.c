@@ -695,9 +695,9 @@ int main(void) {
 
 
     // Load texture atlas (ensure resources/simple_color64x64.png exists)
-    Image atlasImage = LoadImage("resources/simple_color64x64.png");
+    Image atlasImage = LoadImage("resources/altas_texture64x64.png");
     if (atlasImage.data == NULL) {
-        TraceLog(LOG_ERROR, "Failed to load texture: resources/simple_color64x64.png");
+        TraceLog(LOG_ERROR, "Failed to load texture: resources/altas_texture64x64.png");
         CloseWindow();
         return 1;
     }
@@ -707,7 +707,13 @@ int main(void) {
 
     // Tile indices for each face (front, back, left, right, top, bottom)
     // int tileIndices[6] = { 0, 1, 2, 3, 4, 5 };  // Example: different tiles per face
-    int tileIndices[6] = { 8, 2, 2, 2, 2, 2 };  // Example: different tiles per face
+    int tileIndices[6] = { 1, 1, 1, 1, 0, 2 };  // Example: different tiles per face
+    // 1 = side
+    // 2 = side
+    // 3 = side
+    // 4 = side
+    // 5 = top
+    // 6 = bottom
 
     // Create cube mesh and model
     Mesh cubeMesh = GenMeshCubeCustomUV(1.0f, 1.0f, 1.0f, tileIndices);

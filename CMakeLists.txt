@@ -176,8 +176,8 @@ FetchContent_MakeAvailable(stb)
 #================================================
 # Application
 #================================================
-# set(EXAMPLE_APP ON) #ON OFF bool
-set(EXAMPLE_APP OFF) #ON OFF bool
+set(EXAMPLE_APP ON) #ON OFF bool
+# set(EXAMPLE_APP OFF) #ON OFF bool
 if(${EXAMPLE_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
@@ -214,7 +214,10 @@ if(${EXAMPLE_APP})
         # examples/raylib_raycast_picking01.c 
         # examples/c/raylib_atlas_texture.c 
         # examples/c/raylib_noise_texture.c 
-        examples/c/raylib_flecs_models.c 
+        # examples/c/raylib_flecs_models.c 
+        # examples/c/raylib_raycast_picking_hit.c 
+        examples/c/raylib_third_person.c 
+        # examples/c/raylib_ode_static_box.c 
 
     )
 
@@ -236,7 +239,7 @@ if(${EXAMPLE_APP})
         ${raylib_SOURCE_DIR}/src                            # raylib include
         ${raylib_SOURCE_DIR}/src/external/glfw/include      # glfw
         # ${enet_SOURCE_DIR}/include                        # enet
-        ${stb_SOURCE_DIR}                                 # stb
+        ${stb_SOURCE_DIR}                                   # stb
         ${raygui_SOURCE_DIR}/src                            # raygui
         ${cglm_SOURCE_DIR}/include                          # clgm
     )
@@ -499,7 +502,10 @@ if(${EXPORT_ODE_APP})
     set(APP_ODE_NAME rl_flecs_ode)
     add_executable(${APP_ODE_NAME}
         # examples/c/raylib_flecs_ode_gui03.c
-        examples/c/raylib_flecs_ode_controller.c
+        # examples/c/raylib_flecs_ode_controller.c
+        # examples/c/raylib_ode_static_box.c
+        # examples/c/raylib_ode_capsule_mesh.c
+        examples/c/raylib_ode_capsule_controller.c
     )
     # Link application with custom_cimgui
     target_link_libraries(${APP_ODE_NAME} PRIVATE 
