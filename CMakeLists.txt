@@ -176,8 +176,8 @@ FetchContent_MakeAvailable(stb)
 #================================================
 # Application
 #================================================
-set(EXAMPLE_APP ON) #ON OFF bool
-# set(EXAMPLE_APP OFF) #ON OFF bool
+# set(EXAMPLE_APP ON) #ON OFF bool
+set(EXAMPLE_APP OFF) #ON OFF bool
 if(${EXAMPLE_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
@@ -268,8 +268,8 @@ if(${EXAMPLE_APP})
     endif()
 endif()
 
-set(EXPORT_FLECS_APP ON)
-# set(EXPORT_FLECS_APP OFF)
+# set(EXPORT_FLECS_APP ON)
+set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_FLECS_APP})
 
     set(SRC_FLECS_MODULES
@@ -506,6 +506,8 @@ if(${EXPORT_ODE_APP})
         # examples/c/raylib_ode_static_box.c
         # examples/c/raylib_ode_capsule_mesh.c
         examples/c/raylib_ode_capsule_controller.c
+        # examples/c/raylib_physics_ode_simple.c
+        # examples/c/raylib_physics_ode_collision_sensor.c
     )
     # Link application with custom_cimgui
     target_link_libraries(${APP_ODE_NAME} PRIVATE 

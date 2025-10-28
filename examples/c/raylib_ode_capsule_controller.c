@@ -1,3 +1,5 @@
+// note that there damping which does not go straight.
+// low force might off degree when doing forward( rotate 45 degree), due capsule still rotate?
 #include "raylib.h"
 #include "raymath.h"
 #include <ode/ode.h>
@@ -30,7 +32,10 @@ void nearCallback(void *data, dGeomID o1, dGeomID o2) {
 
     // Reduce friction only for capsule vs others
     if (o1 == capsuleGeom || o2 == capsuleGeom) {
-        contact.surface.mu = 50.0f;
+        // the highter more friction. 
+        // contact.surface.mu = 50.0f;
+        // contact.surface.mu = 100.0f;
+        contact.surface.mu = 5.0f;
     } else {
         contact.surface.mu = dInfinity;
     }
@@ -66,141 +71,222 @@ Matrix ODEQuaternionToMatrix(dQuaternion q) {
 
 // Generate capsule mesh (Z-up, matches ODE capsule)
 Mesh GenMeshCapsule(float radius, float height, int slices, int rings) {
-    Mesh mesh = {0};
-    float halfHeight = height * 0.5f;
-    int ringsPerHemisphere = rings / 2;
-
-    int vertexCount = 2 + (rings + 2) * (slices + 1);
-    int triangleCount = slices * (2 + rings * 2);
-
+    Mesh mesh = { 0 };
+    float halfHeight = height / 2.0f;
+    int ringsPerHemisphere = rings / 2; // Rings per hemisphere, excluding poles
+    // Vertex count: 1 pole + ringsPerHemisphere * (slices + 1) for top hemisphere,
+    // + (ringsPerHemisphere + 1) * (slices + 1) for bottom hemisphere (include last ring),
+    // + 2 cylinder rings
+    int vertexCount = 1 + ringsPerHemisphere * (slices + 1) + (ringsPerHemisphere + 1) * (slices + 1) + 2 * (slices + 1) + 1;
+    // Triangle count: (slices + (ringsPerHemisphere - 1) * slices * 2) for top hemisphere
+    // + (slices + ringsPerHemisphere * slices * 2) for bottom hemisphere + slices * 2 for cylinder
+    int triangleCount = (slices + (ringsPerHemisphere - 1) * slices * 2) + (slices + ringsPerHemisphere * slices * 2) + slices * 2;
     mesh.vertexCount = vertexCount;
     mesh.triangleCount = triangleCount;
-    mesh.vertices = RL_MALLOC(vertexCount * 3 * sizeof(float));
-    mesh.normals  = RL_MALLOC(vertexCount * 3 * sizeof(float));
-    mesh.texcoords = RL_MALLOC(vertexCount * 2 * sizeof(float));
-    mesh.indices = RL_MALLOC(triangleCount * 3 * sizeof(unsigned short));
+    mesh.vertices = (float *)RL_MALLOC(vertexCount * 3 * sizeof(float));
+    mesh.normals = (float *)RL_MALLOC(vertexCount * 3 * sizeof(float));
+    mesh.texcoords = (float *)RL_MALLOC(vertexCount * 2 * sizeof(float));
+    mesh.indices = (unsigned short *)RL_MALLOC(triangleCount * 3 * sizeof(unsigned short));
 
     int v = 0, i = 0;
 
-    // Top pole
-    mesh.vertices[v*3+0] = 0; mesh.vertices[v*3+1] = 0; mesh.vertices[v*3+2] = halfHeight + radius;
-    mesh.normals[v*3+0] = 0; mesh.normals[v*3+1] = 0; mesh.normals[v*3+2] = 1;
-    mesh.texcoords[v*2+0] = 0.5f; mesh.texcoords[v*2+1] = 0.0f; v++;
+    // Top pole (single vertex at z = halfHeight + radius)
+    printf("Top Pole Vertex:\n");
+    mesh.vertices[v * 3 + 0] = 0.0f;
+    mesh.vertices[v * 3 + 1] = 0.0f;
+    mesh.vertices[v * 3 + 2] = halfHeight + radius;
+    mesh.normals[v * 3 + 0] = 0.0f;
+    mesh.normals[v * 3 + 1] = 0.0f;
+    mesh.normals[v * 3 + 2] = 1.0f;
+    mesh.texcoords[v * 2 + 0] = 0.5f;
+    mesh.texcoords[v * 2 + 1] = 0.0f;
+    printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, mesh.vertices[v * 3 + 0], mesh.vertices[v * 3 + 1], mesh.vertices[v * 3 + 2]);
+    v++;
 
-    // Top hemisphere
+    // Top hemisphere (z from halfHeight to halfHeight + radius, excluding pole)
+    printf("\nTop Hemisphere Vertices:\n");
     for (int j = 1; j <= ringsPerHemisphere; j++) {
-        float phi = j * PI / 2.0f / ringsPerHemisphere;
+        float phi = (float)j * PI / 2.0f / ringsPerHemisphere; // 0 to PI/2
         for (int k = 0; k <= slices; k++) {
-            float theta = k * 2*PI / slices;
-            float sp = sinf(phi), cp = cosf(phi);
-            float x = radius * sp * cosf(theta);
-            float y = radius * sp * sinf(theta);
-            float z = radius * cp + halfHeight;
-            mesh.vertices[v*3+0] = x; mesh.vertices[v*3+1] = y; mesh.vertices[v*3+2] = z;
-            mesh.normals[v*3+0] = x/radius; mesh.normals[v*3+1] = y/radius; mesh.normals[v*3+2] = (z-halfHeight)/radius;
-            mesh.texcoords[v*2+0] = (float)k/slices; mesh.texcoords[v*2+1] = (float)j/(ringsPerHemisphere*2);
+            float theta = (float)k * 2.0f * PI / slices;
+            float sinPhi = sinf(phi);
+            float x = radius * sinPhi * cosf(theta);
+            float y = radius * sinPhi * sinf(theta);
+            float z = radius * cosf(phi) + halfHeight;
+            mesh.vertices[v * 3 + 0] = x;
+            mesh.vertices[v * 3 + 1] = y;
+            mesh.vertices[v * 3 + 2] = z;
+            mesh.normals[v * 3 + 0] = x / radius;
+            mesh.normals[v * 3 + 1] = y / radius;
+            mesh.normals[v * 3 + 2] = (z - halfHeight) / radius;
+            mesh.texcoords[v * 2 + 0] = (float)k / slices;
+            mesh.texcoords[v * 2 + 1] = (float)j / (ringsPerHemisphere * 2);
+            printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, x, y, z);
             v++;
         }
     }
 
-    // Cylinder top ring
+    // Cylinder top ring (at z = halfHeight)
+    printf("\nCylinder Top Ring Vertices:\n");
     for (int k = 0; k <= slices; k++) {
-        float theta = k * 2*PI / slices;
+        float theta = (float)k * 2.0f * PI / slices;
         float x = radius * cosf(theta);
         float y = radius * sinf(theta);
-        mesh.vertices[v*3+0] = x; mesh.vertices[v*3+1] = y; mesh.vertices[v*3+2] = halfHeight;
-        mesh.normals[v*3+0] = x/radius; mesh.normals[v*3+1] = y/radius; mesh.normals[v*3+2] = 0;
-        mesh.texcoords[v*2+0] = (float)k/slices; mesh.texcoords[v*2+1] = 0.5f;
+        float z = halfHeight;
+        mesh.vertices[v * 3 + 0] = x;
+        mesh.vertices[v * 3 + 1] = y;
+        mesh.vertices[v * 3 + 2] = z;
+        mesh.normals[v * 3 + 0] = x / radius;
+        mesh.normals[v * 3 + 1] = y / radius;
+        mesh.normals[v * 3 + 2] = 0.0f;
+        mesh.texcoords[v * 2 + 0] = (float)k / slices;
+        mesh.texcoords[v * 2 + 1] = 0.5f;
+        printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, x, y, z);
         v++;
     }
 
-    // Cylinder bottom ring
+    // Cylinder bottom ring (at z = -halfHeight)
+    printf("\nCylinder Bottom Ring Vertices:\n");
     for (int k = 0; k <= slices; k++) {
-        float theta = k * 2*PI / slices;
+        float theta = (float)k * 2.0f * PI / slices;
         float x = radius * cosf(theta);
         float y = radius * sinf(theta);
-        mesh.vertices[v*3+0] = x; mesh.vertices[v*3+1] = y; mesh.vertices[v*3+2] = -halfHeight;
-        mesh.normals[v*3+0] = x/radius; mesh.normals[v*3+1] = y/radius; mesh.normals[v*3+2] = 0;
-        mesh.texcoords[v*2+0] = (float)k/slices; mesh.texcoords[v*2+1] = 0.5f;
+        float z = -halfHeight;
+        mesh.vertices[v * 3 + 0] = x;
+        mesh.vertices[v * 3 + 1] = y;
+        mesh.vertices[v * 3 + 2] = z;
+        mesh.normals[v * 3 + 0] = x / radius;
+        mesh.normals[v * 3 + 1] = y / radius;
+        mesh.normals[v * 3 + 2] = 0.0f;
+        mesh.texcoords[v * 2 + 0] = (float)k / slices;
+        mesh.texcoords[v * 2 + 1] = 0.5f;
+        printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, x, y, z);
         v++;
     }
 
-    // Bottom hemisphere
-    for (int j = 0; j <= ringsPerHemisphere; j++) {
-        float phi = PI/2.0f + j * PI/2.0f / ringsPerHemisphere;
+    // Bottom hemisphere (z from -halfHeight to just before -halfHeight - radius)
+    printf("\nBottom Hemisphere Vertices:\n");
+    for (int j = 0; j <= ringsPerHemisphere; j++) { // Include last ring
+        float phi = PI / 2.0f + (float)j * PI / 2.0f / ringsPerHemisphere; // PI/2 to PI
         for (int k = 0; k <= slices; k++) {
-            float theta = k * 2*PI / slices;
-            float sp = sinf(phi), cp = cosf(phi);
-            float x = radius * sp * cosf(theta);
-            float y = radius * sp * sinf(theta);
-            float z = radius * cp - halfHeight;
-            mesh.vertices[v*3+0] = x; mesh.vertices[v*3+1] = y; mesh.vertices[v*3+2] = z;
-            mesh.normals[v*3+0] = x/radius; mesh.normals[v*3+1] = y/radius; mesh.normals[v*3+2] = (z+halfHeight)/radius;
-            mesh.texcoords[v*2+0] = (float)k/slices; mesh.texcoords[v*2+1] = 0.5f + (float)j/(ringsPerHemisphere*2);
+            float theta = (float)k * 2.0f * PI / slices;
+            float sinPhi = sinf(phi);
+            float x = radius * sinPhi * cosf(theta);
+            float y = radius * sinPhi * sinf(theta);
+            float z = radius * cosf(phi) - halfHeight;
+            mesh.vertices[v * 3 + 0] = x;
+            mesh.vertices[v * 3 + 1] = y;
+            mesh.vertices[v * 3 + 2] = z;
+            mesh.normals[v * 3 + 0] = x / radius;
+            mesh.normals[v * 3 + 1] = y / radius;
+            mesh.normals[v * 3 + 2] = (z + halfHeight) / radius;
+            mesh.texcoords[v * 2 + 0] = (float)k / slices;
+            mesh.texcoords[v * 2 + 1] = (float)(j + ringsPerHemisphere) / (ringsPerHemisphere * 2);
+            printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, x, y, z);
             v++;
         }
     }
 
-    // Bottom pole
-    mesh.vertices[v*3+0] = 0; mesh.vertices[v*3+1] = 0; mesh.vertices[v*3+2] = -halfHeight - radius;
-    mesh.normals[v*3+0] = 0; mesh.normals[v*3+1] = 0; mesh.normals[v*3+2] = -1;
-    mesh.texcoords[v*2+0] = 0.5f; mesh.texcoords[v*2+1] = 1.0f; v++;
+    // Bottom pole (single vertex at z = -halfHeight - radius)
+    printf("\nBottom Pole Vertex:\n");
+    mesh.vertices[v * 3 + 0] = 0.0f;
+    mesh.vertices[v * 3 + 1] = 0.0f;
+    mesh.vertices[v * 3 + 2] = -halfHeight - radius;
+    mesh.normals[v * 3 + 0] = 0.0f;
+    mesh.normals[v * 3 + 1] = 0.0f;
+    mesh.normals[v * 3 + 2] = -1.0f;
+    mesh.texcoords[v * 2 + 0] = 0.5f;
+    mesh.texcoords[v * 2 + 1] = 1.0f;
+    printf("Vertex %d: (%.4f, %.4f, %.4f)\n", v, mesh.vertices[v * 3 + 0], mesh.vertices[v * 3 + 1], mesh.vertices[v * 3 + 2]);
+    v++;
 
-    // Indices (simplified, correct winding)
-    int topPole = 0;
-    int topStart = 1;
-    int cylTop = topStart + ringsPerHemisphere * (slices + 1);
-    int cylBottom = cylTop + (slices + 1);
-    int bottomStart = cylBottom + (slices + 1);
-    int bottomPole = bottomStart + (ringsPerHemisphere + 1) * (slices + 1);
-
-    // Top hemisphere
+    // Indices for top hemisphere (including pole)
+    int topHemisphereStart = 1; // After top pole
+    printf("\nTop Hemisphere Indices:\n");
+    // Pole triangles (connect pole to first ring)
     for (int k = 0; k < slices; k++) {
-        mesh.indices[i++] = topPole;
-        mesh.indices[i++] = topStart + k;
-        mesh.indices[i++] = topStart + (k+1);
+        int v0 = 0; // Top pole
+        int v1 = topHemisphereStart + k;
+        int v2 = topHemisphereStart + (k + 1) % (slices + 1);
+        mesh.indices[i++] = v0;
+        mesh.indices[i++] = v1;
+        mesh.indices[i++] = v2;
+        printf("Triangle %d: (%d, %d, %d)\n", i/3-1, v0, v1, v2);
     }
+    // Remaining top hemisphere quads
     for (int j = 0; j < ringsPerHemisphere - 1; j++) {
         for (int k = 0; k < slices; k++) {
-            int a = topStart + j*(slices+1) + k;
-            int b = a + 1;
-            int c = a + (slices+1);
-            int d = c + 1;
-            mesh.indices[i++] = a; mesh.indices[i++] = c; mesh.indices[i++] = b;
-            mesh.indices[i++] = b; mesh.indices[i++] = c; mesh.indices[i++] = d;
+            int v0 = topHemisphereStart + j * (slices + 1) + k;
+            int v1 = v0 + 1;
+            int v2 = topHemisphereStart + (j + 1) * (slices + 1) + k;
+            int v3 = v2 + 1;
+            mesh.indices[i++] = v0;
+            mesh.indices[i++] = v2;
+            mesh.indices[i++] = v1;
+            mesh.indices[i++] = v1;
+            mesh.indices[i++] = v2;
+            mesh.indices[i++] = v3;
+            printf("Triangle %d: (%d, %d, %d)\n", i/3-2, v0, v2, v1);
+            printf("Triangle %d: (%d, %d, %d)\n", i/3-1, v1, v2, v3);
         }
     }
 
-    // Cylinder
+    // Indices for cylinder (connect top ring to bottom ring)
+    int topRingOffset = topHemisphereStart + ringsPerHemisphere * (slices + 1);
+    int bottomRingOffset = topRingOffset + (slices + 1);
+    printf("\nCylinder Indices:\n");
     for (int k = 0; k < slices; k++) {
-        int a = cylTop + k;
-        int b = a + 1;
-        int c = cylBottom + k;
-        int d = c + 1;
-        mesh.indices[i++] = a; mesh.indices[i++] = c; mesh.indices[i++] = b;
-        mesh.indices[i++] = b; mesh.indices[i++] = c; mesh.indices[i++] = d;
+        int v0 = topRingOffset + k;
+        int v1 = v0 + 1;
+        int v2 = bottomRingOffset + k;
+        int v3 = v2 + 1;
+        mesh.indices[i++] = v0;
+        mesh.indices[i++] = v2;
+        mesh.indices[i++] = v1;
+        mesh.indices[i++] = v1;
+        mesh.indices[i++] = v2;
+        mesh.indices[i++] = v3;
+        printf("Triangle %d: (%d, %d, %d)\n", i/3-2, v0, v2, v1);
+        printf("Triangle %d: (%d, %d, %d)\n", i/3-1, v1, v2, v3);
     }
 
-    // Bottom hemisphere
+    // Indices for bottom hemisphere (including pole)
+    int bottomHemisphereOffset = bottomRingOffset + (slices + 1);
+    int bottomPole = bottomHemisphereOffset + ringsPerHemisphere * (slices + 1);
+    printf("\nBottom Hemisphere Indices:\n");
+    // Bottom hemisphere quads
     for (int j = 0; j < ringsPerHemisphere; j++) {
         for (int k = 0; k < slices; k++) {
-            int a = bottomStart + j*(slices+1) + k;
-            int b = a + 1;
-            int c = a + (slices+1);
-            int d = c + 1;
-            mesh.indices[i++] = a; mesh.indices[i++] = c; mesh.indices[i++] = b;
-            mesh.indices[i++] = b; mesh.indices[i++] = c; mesh.indices[i++] = d;
+            int v0 = bottomHemisphereOffset + j * (slices + 1) + k;
+            int v1 = v0 + 1;
+            int v2 = bottomHemisphereOffset + (j + 1) * (slices + 1) + k;
+            int v3 = v2 + 1;
+            mesh.indices[i++] = v0;
+            mesh.indices[i++] = v2;
+            mesh.indices[i++] = v1;
+            mesh.indices[i++] = v1;
+            mesh.indices[i++] = v2;
+            mesh.indices[i++] = v3;
+            printf("Triangle %d: (%d, %d, %d)\n", i/3-2, v0, v2, v1);
+            printf("Triangle %d: (%d, %d, %d)\n", i/3-1, v1, v2, v3);
         }
     }
+    // Pole triangles (connect last ring to bottom pole)
     for (int k = 0; k < slices; k++) {
-        mesh.indices[i++] = bottomPole;
-        mesh.indices[i++] = bottomStart + ringsPerHemisphere*(slices+1) + (k+1);
-        mesh.indices[i++] = bottomStart + ringsPerHemisphere*(slices+1) + k;
+        int v0 = bottomPole;
+        int v1 = bottomHemisphereOffset + ringsPerHemisphere * (slices + 1) + k;
+        int v2 = bottomHemisphereOffset + ringsPerHemisphere * (slices + 1) + (k + 1) % (slices + 1);
+        mesh.indices[i++] = v0;
+        mesh.indices[i++] = v2; // Reversed for correct winding
+        mesh.indices[i++] = v1;
+        printf("Triangle %d: (%d, %d, %d)\n", i/3-1, v0, v2, v1);
     }
 
+    // Upload mesh data to GPU
     UploadMesh(&mesh, false);
     return mesh;
 }
+
 
 int main(void) {
     InitWindow(800, 600, "ODE + Raylib: Capsule Character Controller");
@@ -213,8 +299,8 @@ int main(void) {
 
     // Models
     cubeModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
-    // capsuleModel = LoadModelFromMesh(GenMeshCapsule(0.5f, 1.0f, 16, 16));
-    capsuleModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    capsuleModel = LoadModelFromMesh(GenMeshCapsule(0.5f, 1.0f, 8, 8));
+    // capsuleModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
     
     // ODE Setup
     dInitODE();
@@ -260,6 +346,13 @@ int main(void) {
     dBodySetMaxAngularSpeed(capsuleBody, 0.0f);
 
     printf("init loop\n");
+
+    Vector3 playerPos = { 0.0f, 0.5f, 0.0f };
+    const float camDistance = 8.0f;
+    const float camPitch    = 45.0f * DEG2RAD;
+    float camYaw = 0.0f;
+    Vector2 mousePrev = { 0 };
+    bool mousePressed = false;
 
     while (!WindowShouldClose()) {
         // === ODE STEP ===
@@ -311,61 +404,114 @@ int main(void) {
         Vector3 forwardXZ = { cosf(yaw), 0.0f, sinf(yaw) };
         Vector3 rightXZ   = { -sinf(yaw), 0.0f, cosf(yaw) };
 
-        // === CAPSULE MOVEMENT ===
-        if (capsuleMovementEnabled) {
-            Vector3 force = {0};
+        // Vector3 refPoint;
 
-            if (IsKeyDown(KEY_S)) force = Vector3Add(force, Vector3Scale(rightXZ, -20.0f));
-            if (IsKeyDown(KEY_W)) force = Vector3Add(force, Vector3Scale(rightXZ,  20.0f));
+        // ---------------------------------------------------------------------
+//  CAPSULE MOVEMENT + THIRD-PERSON CAMERA (ODE-driven)
+// ---------------------------------------------------------------------
+if (capsuleMovementEnabled) {
 
-            if (IsKeyDown(KEY_A)) force = Vector3Add(force, Vector3Scale(forwardXZ, 20.0f));
-            if (IsKeyDown(KEY_D)) force = Vector3Add(force, Vector3Scale(forwardXZ, -20.0f));
+    /* ---------- 1. Mouse-look (rotate character yaw) ---------- */
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        mousePrev    = GetMousePosition();
+        mousePressed = true;
+    }
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) mousePressed = false;
 
-            // if (IsKeyDown(KEY_W)) force = Vector3Add(force, Vector3Scale(forwardXZ, 20.0f));
-            // if (IsKeyDown(KEY_S)) force = Vector3Add(force, Vector3Scale(forwardXZ, -20.0f));
-            // if (IsKeyDown(KEY_A)) force = Vector3Add(force, Vector3Scale(rightXZ, -20.0f));
-            // if (IsKeyDown(KEY_D)) force = Vector3Add(force, Vector3Scale(rightXZ,  20.0f));
+    if (mousePressed) {
+        Vector2 now   = GetMousePosition();
+        Vector2 delta = Vector2Subtract(now, mousePrev);
+        camYaw       -= delta.x * 0.005f;               // <-- character yaw
+        mousePrev    = now;
+    }
 
-            if (IsKeyPressed(KEY_SPACE)) {
-                const dReal *pos = dBodyGetPosition(capsuleBody);
-                if (pos[1] < 1.1f) dBodyAddForce(capsuleBody, 0, 500.0f, 0);
-            }
+    /* ---------- 2. Get capsule centre from ODE ---------- */
+    const dReal *p = dBodyGetPosition(capsuleBody);
+    Vector3 capsulePos = { (float)p[0], (float)p[1], (float)p[2] };
 
-            // dBodyAddForce(capsuleBody, force.x, force.y, force.z);
-            dBodyAddForce(capsuleBody, force.x, 0.0f, force.z);
-        }
+    /* ---------- 3. Third-person camera (behind & above) ---------- */
+    const float camDistance = 8.0f;
+    const float camPitch    = 45.0f * DEG2RAD;          // fixed pitch
 
-        // === CAMERA FOLLOW (Third-Person) ===
-        if (capsuleMovementEnabled) {
-            const dReal *pos = dBodyGetPosition(capsuleBody);
-            Vector3 capsulePos = { (float)pos[0], (float)pos[1], (float)pos[2] };
+    Vector3 camOffset = {
+        camDistance * cosf(camPitch) * sinf(camYaw),   // X
+        camDistance * sinf(camPitch),                 // Y
+        camDistance * cosf(camPitch) * cosf(camYaw)    // Z
+    };
 
-            // Offset: behind and above
-            Vector3 localOffset = { 0.0f, 3.0f, -5.0f };  // -Z = behind
-            Vector3 worldOffset = {
-                localOffset.x * cosf(yaw) - localOffset.z * sinf(yaw),
-                localOffset.y,
-                localOffset.x * sinf(yaw) + localOffset.z * cosf(yaw)
-            };
+    camera.position = Vector3Add(capsulePos, camOffset);
+    camera.target   = capsulePos;                       // look at capsule centre
 
-            Vector3 targetPos = Vector3Add(capsulePos, worldOffset);
-            float t = 8.0f * GetFrameTime();
-            camera.position = Vector3Lerp(camera.position, targetPos, t);
-            camera.target = Vector3Add(capsulePos, (Vector3){0, 0.5f, 0});
-        }
-        // === FREE CAMERA ===
-        else if (cameraControlEnabled) {
-            float speed = 5.0f * GetFrameTime();
-            if (IsKeyDown(KEY_W)) camera.position = Vector3Add(camera.position, Vector3Scale(forward, speed));
-            if (IsKeyDown(KEY_S)) camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, speed));
-            if (IsKeyDown(KEY_A)) camera.position = Vector3Subtract(camera.position, Vector3Scale((Vector3){rightXZ.x, 0, rightXZ.z}, speed));
-            if (IsKeyDown(KEY_D)) camera.position = Vector3Add(camera.position, Vector3Scale((Vector3){rightXZ.x, 0, rightXZ.z}, speed));
-            if (IsKeyDown(KEY_SPACE)) camera.position.y += speed;
-            if (IsKeyDown(KEY_LEFT_SHIFT)) camera.position.y -= speed;
-            camera.target = Vector3Add(camera.position, forward);
-        } else {
-            camera.target = Vector3Add(camera.position, forward);
-        }
+    /* ---------- 4. Build forward / right XZ vectors ---------- */
+    Vector3 camForward = Vector3Subtract(camera.target, camera.position);
+    camForward = Vector3Normalize(camForward);
+
+    Vector3 forwardXZ = { camForward.x, 0.0f, camForward.z };
+    forwardXZ = Vector3Normalize(forwardXZ);
+
+    Vector3 rightXZ = Vector3CrossProduct(forwardXZ, (Vector3){0,1,0});
+    rightXZ = Vector3Normalize(rightXZ);
+
+    /* ---------- 5. WASD movement → force on capsule ---------- */
+    // const float moveForce = 80.0f;                     // tweak to taste
+    const float moveForce = 20.0f;                     // tweak to taste
+
+    Vector3 wish = {0};
+    if (IsKeyDown(KEY_W)) wish = Vector3Add(wish, forwardXZ);
+    if (IsKeyDown(KEY_S)) wish = Vector3Subtract(wish, forwardXZ);
+    if (IsKeyDown(KEY_A)) wish = Vector3Subtract(wish, rightXZ);
+    if (IsKeyDown(KEY_D)) wish = Vector3Add(wish, rightXZ);
+
+
+    if (Vector3LengthSqr(wish) > 0.0f) {
+        // === LOCK ROTATION (no spin) ===
+        dBodySetAngularVel(capsuleBody, 0, 0, 0);
+        dBodySetMaxAngularSpeed(capsuleBody, 0.0f);
+
+
+        // move base direction
+        wish = Vector3Scale(Vector3Normalize(wish), moveForce);
+        dBodyAddForce(capsuleBody, wish.x, 0.0f, wish.z);
+    }
+
+    /* ---------- 6. Simple jump (ground check) ---------- */
+    if (IsKeyPressed(KEY_SPACE)) {
+        if (p[1] < 1.1f)                     // capsule radius = 0.5 → ground ≈ 0.6
+            dBodyAddForce(capsuleBody, 0.0f, 500.0f, 0.0f);
+    }
+}
+
+        // // === CAMERA FOLLOW (Third-Person) ===
+        // if (capsuleMovementEnabled) {
+        //     const dReal *pos = dBodyGetPosition(capsuleBody);
+        //     Vector3 capsulePos = { (float)pos[0], (float)pos[1], (float)pos[2] };
+
+        //     // Offset: behind and above
+        //     Vector3 localOffset = { 0.0f, 3.0f, -5.0f };  // -Z = behind
+        //     Vector3 worldOffset = {
+        //         localOffset.x * cosf(yaw) - localOffset.z * sinf(yaw),
+        //         localOffset.y,
+        //         localOffset.x * sinf(yaw) + localOffset.z * cosf(yaw)
+        //     };
+
+        //     Vector3 targetPos = Vector3Add(capsulePos, worldOffset);
+        //     float t = 8.0f * GetFrameTime();
+        //     camera.position = Vector3Lerp(camera.position, targetPos, t);
+        //     camera.target = Vector3Add(capsulePos, (Vector3){0, 0.5f, 0});
+        // }
+        // // === FREE CAMERA ===
+        // else if (cameraControlEnabled) {
+        //     float speed = 5.0f * GetFrameTime();
+        //     if (IsKeyDown(KEY_W)) camera.position = Vector3Add(camera.position, Vector3Scale(forward, speed));
+        //     if (IsKeyDown(KEY_S)) camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, speed));
+        //     if (IsKeyDown(KEY_A)) camera.position = Vector3Subtract(camera.position, Vector3Scale((Vector3){rightXZ.x, 0, rightXZ.z}, speed));
+        //     if (IsKeyDown(KEY_D)) camera.position = Vector3Add(camera.position, Vector3Scale((Vector3){rightXZ.x, 0, rightXZ.z}, speed));
+        //     if (IsKeyDown(KEY_SPACE)) camera.position.y += speed;
+        //     if (IsKeyDown(KEY_LEFT_SHIFT)) camera.position.y -= speed;
+        //     camera.target = Vector3Add(camera.position, forward);
+        // } else {
+        //     camera.target = Vector3Add(camera.position, forward);
+        // }
 
         // === RENDER ===
         BeginDrawing();
@@ -401,6 +547,8 @@ int main(void) {
         capsuleModel.transform = m;
         DrawModel(capsuleModel, (Vector3){0}, 1.0f, YELLOW);
         DrawModelWires(capsuleModel, (Vector3){0}, 1.0f, BLACK);
+
+        DrawCube(playerPos,1.0f,1.0f,1.0f,BLUE);
 
         EndMode3D();
 
