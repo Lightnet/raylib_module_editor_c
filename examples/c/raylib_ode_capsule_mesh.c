@@ -293,6 +293,8 @@ Mesh GenMeshCapsule(float radius, float height, int slices, int rings) {
     return mesh;
 }
 
+
+
 // main
 int main(void) {
     // Initialize window

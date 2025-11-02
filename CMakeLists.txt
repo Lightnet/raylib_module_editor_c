@@ -176,8 +176,8 @@ FetchContent_MakeAvailable(stb)
 #================================================
 # Application
 #================================================
-# set(EXAMPLE_APP ON) #ON OFF bool
-set(EXAMPLE_APP OFF) #ON OFF bool
+set(EXAMPLE_APP ON) #ON OFF bool
+# set(EXAMPLE_APP OFF) #ON OFF bool
 if(${EXAMPLE_APP})
     message(STATUS "EXPORT APP")
     set(APP_NAME ril)
@@ -216,9 +216,12 @@ if(${EXAMPLE_APP})
         # examples/c/raylib_noise_texture.c 
         # examples/c/raylib_flecs_models.c 
         # examples/c/raylib_raycast_picking_hit.c 
-        examples/c/raylib_third_person.c 
+        # examples/c/raylib_third_person.c 
+        # examples/c/raylib_camera_model.c 
+        # examples/c/raylib_text3d.c 
+        # examples/c/raylib_camera_move.c 
+        examples/c/raylib_camera_model.c 
         # examples/c/raylib_ode_static_box.c 
-
     )
 
     # Link application with custom_cimgui
@@ -496,8 +499,8 @@ if(${EXPORT_ENET_APP})
     endif()
 endif()
 
-set(EXPORT_ODE_APP ON)
-# set(EXPORT_FLECS_APP OFF)
+# set(EXPORT_ODE_APP ON)
+set(EXPORT_FLECS_APP OFF)
 if(${EXPORT_ODE_APP})
     set(APP_ODE_NAME rl_flecs_ode)
     add_executable(${APP_ODE_NAME}

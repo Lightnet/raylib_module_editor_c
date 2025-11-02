@@ -59,6 +59,8 @@ int main(void)
     float yaw = 0.0f;    // Horizontal rotation
     float pitch = 0.0f;  // Vertical rotation
 
+    Model characterModel = LoadModel("resources/models/block_texture.gltf"); // Load model
+
     // Simple floor grid for reference
     float floorSize = 100.0f;
     int gridDivisions = 10;
@@ -75,13 +77,17 @@ int main(void)
             yaw += mouseDelta.x * MOUSE_SENSITIVITY;
             yaw = NormalizeAngle(yaw);
 
+            // TraceLog(LOG_INFO, "yaw: %f", yaw);
+
             pitch -= mouseDelta.y * MOUSE_SENSITIVITY;
+
             // Clamp pitch to prevent flipping
             pitch = Clamp(pitch, -MAX_PITCH, MAX_PITCH);
         }
 
         // Calculate forward direction using spherical coordinates
         Vector3 forward;
+        // yaw = NormalizeAngleDegrees(yaw);
         forward.x = cosf(yaw) * cosf(pitch);
         forward.y = sinf(pitch);
         forward.z = sinf(yaw) * cosf(pitch);
@@ -141,12 +147,13 @@ int main(void)
         DrawGrid(floorSize, gridDivisions);
 
         // Draw reference objects
-        DrawCube((Vector3){-5, 0.5f, -5}, 1.0f, 1.0f, 1.0f, RED);
-        DrawCube((Vector3){5, 0.5f, -5}, 1.0f, 1.0f, 1.0f, GREEN);
-        DrawCube((Vector3){0, 0.5f, -10}, 2.0f, 0.1f, 4.0f, BLUE);
+        // DrawCube((Vector3){-5, 0.5f, -5}, 1.0f, 1.0f, 1.0f, RED);
+        // DrawCube((Vector3){5, 0.5f, -5}, 1.0f, 1.0f, 1.0f, GREEN);
+        // DrawCube((Vector3){0, 0.5f, -10}, 2.0f, 0.1f, 4.0f, BLUE);
         
         // Draw camera position marker
         DrawSphereWires(camera.position, 0.2f, 8, 8, YELLOW);
+        DrawMesh(characterModel.meshes[0], characterModel.materials[1], characterModel.transform);
 
         EndMode3D();
 
