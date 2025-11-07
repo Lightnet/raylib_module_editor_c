@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(raylib_module_c LANGUAGES C CXX)
 
+# set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -220,7 +222,9 @@ if(${EXAMPLE_APP})
         # examples/c/raylib_camera_model.c 
         # examples/c/raylib_text3d.c 
         # examples/c/raylib_camera_move.c 
-        examples/c/raylib_camera_model.c 
+        # examples/c/raylib_camera_model.c 
+        # examples/c/flecs_onload.c 
+        examples/c/flecs_onstart.c 
         # examples/c/raylib_ode_static_box.c 
     )
 
@@ -300,6 +304,7 @@ if(${EXPORT_FLECS_APP})
         # src/main_ode_test.c
         # src/main_ode_controller_test.c
         # src/main_raylib_libevent_test.c
+        # src/main_editor_test.c
         src/main_editor_test.c
         # src/main_transform_3d_hierarchy_test.c
         # src/main_transform_3d_hierarchy_test01.c
